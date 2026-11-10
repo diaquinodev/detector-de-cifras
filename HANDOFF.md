@@ -17,9 +17,11 @@ QG: brain/plans/detector-de-cifras/phase-0-repositorio-e-importacao.md
 - código de `cifras/` e pesquisa (`docs/pesquisa/`) copiados do laboratório `D:\PROJETOS\moises-rea`, sem mudar código
 - pyproject (pytest), requirements-test.txt, CI com pytest, README e AGENTS.md do projeto
 - `python -m pytest`: 95 testes e 676 subtestes verdes, igual ao laboratório
+- revisão do Codex (Revise) tratada: LICENSE e PROCEDENCIA.md no vendor do BTC; .gitignore barra GuitarSet e *.jams em qualquer pasta
 
 ## Falta
-- revisão cruzada do PR da fase 0 por outro agente (Codex)
+- nova revisão do Codex no commit atual do PR #1
+- fixture fictícia para `SavedChartsTest` (no CI ele passa sem conferir nada, porque `cifras/saida/` não vai ao Git)
 - fase 1 (ruff) e fase 2 (pesos reproduzíveis)
 
 ## Próximo comando
@@ -29,4 +31,4 @@ usuário: merge do PR da fase 0; depois "continuar" para a fase 1 (estilo com ru
 nenhum
 
 ## Atualizado em
-2026-11-10 15:30
+2026-11-10 16:00
