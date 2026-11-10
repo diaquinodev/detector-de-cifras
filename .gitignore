@@ -1,0 +1,32 @@
+# Segredos e dados reais
+.env
+dados/
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js / Playwright
+node_modules/
+.next/
+next-env.d.ts
+test-results/
+playwright-report/
+
+# Áudio (músicas comerciais nunca vão para o repositório)
+uploads/
+*.mp3
+*.wav
+*.flac
+
+# Pesos de modelos de terceiros (baixe à parte; ver README)
+*.pt
+*.ckpt
+
+# Saídas e caches locais do detector
+cifras/saida/
+cifras/cache/
+cifras/anotacoes/

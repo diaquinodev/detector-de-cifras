@@ -1,0 +1,78 @@
+#!/bin/sh
+# handoff-check — confere se o HANDOFF.md está completo e em dia.
+# Regras: AGENTS.md, seção "Troca de agente". Modelo: kit/templates/comum/HANDOFF.md
+#
+# Uso: kit/handoff-check [caminho/do/HANDOFF.md]
+# Saída 0: ok (pode haver avisos). Saída 1: erro que o agente precisa corrigir.
+set -eu
+
+raiz=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "ERRO: rode dentro de um repositório git" >&2
+  exit 1
+}
+arq=${1:-$raiz/HANDOFF.md}
+[ -f "$arq" ] || {
+  echo "ERRO: $arq não existe (copie o modelo: scripts/HANDOFF.modelo.md num projeto, kit/templates/comum/HANDOFF.md no QG)" >&2
+  exit 1
+}
+
+erros=0
+falha() {
+  echo "ERRO: $1" >&2
+  erros=$((erros + 1))
+}
+
+# Conteúdo de uma seção: linhas não vazias entre "## <nome>" e o próximo "## ",
+# ignorando comentários HTML de uma linha. Aceita arquivo com CRLF.
+secao() {
+  tr -d '\r' < "$arq" | awk -v alvo="## $1" '
+    /^## / { dentro = ($0 == alvo); next }
+    !dentro { next }
+    /^[[:space:]]*$/ || /^[[:space:]]*<!--.*-->[[:space:]]*$/ { next }
+    { print }
+  '
+}
+
+for nome in "Agente atual" "Branch" "Trilha" "Plano/fase" "Feito" "Falta" \
+            "Próximo comando" "Bloqueios" "Atualizado em"; do
+  [ -n "$(secao "$nome")" ] || falha "seção \"## $nome\" ausente ou vazia"
+done
+
+if grep -q '{{' "$arq"; then
+  falha "há campos do modelo sem preencher ({{...}})"
+fi
+
+if [ -n "$(secao "Agente atual")" ] &&
+   ! secao "Agente atual" | grep -Eiq 'claude|codex|gemini'; then
+  falha "\"## Agente atual\" deve ser Claude Code, Codex ou Gemini"
+fi
+
+if [ -n "$(secao "Trilha")" ] &&
+   ! secao "Trilha" | grep -Eiq 'rapida|rápida|media|média|grande'; then
+  falha "\"## Trilha\" deve ser rápida, média ou grande"
+fi
+
+registrada=$(secao "Branch" | head -n 1 | tr -d '`' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+atual=$(git branch --show-current)
+case $registrada in *'{{'*) registrada="" ;; esac  # campo do modelo: o erro acima já cobre
+if [ -n "$registrada" ] && [ "$registrada" != "$atual" ]; then
+  falha "branch registrada \"$registrada\" é diferente da atual \"$atual\""
+fi
+
+# Aviso (não erro): o handoff deve andar junto com o código. Rodado antes do commit
+# (como a skill execute pede), basta ele estar no git add; depois, no último commit.
+rel=$(cd "$(dirname "$arq")" && git ls-files --full-name -- "$(basename "$arq")")
+if [ -z "$rel" ]; then
+  echo "AVISO: o HANDOFF.md ainda não foi commitado" >&2
+elif git diff --cached --name-only | grep -qx "$rel"; then
+  :
+elif git rev-parse -q --verify HEAD >/dev/null &&
+     ! git diff-tree --root --no-commit-id --name-only -r HEAD | grep -qx "$rel"; then
+  echo "AVISO: o último commit não atualizou o $rel (handoff desatualizado?)" >&2
+fi
+
+if [ "$erros" -gt 0 ]; then
+  echo "handoff-check: $erros erro(s)" >&2
+  exit 1
+fi
+echo "handoff-check: ok"

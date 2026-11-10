@@ -1,0 +1,51 @@
+name: revisao
+
+# Verde só com revisão, do commit atual, de um agente diferente do autor (ou do CodeRabbit
+# sem pendências). Regra e formato do cabeçalho: scripts/revisao-check.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: write  # só para rodar de novo as execuções vermelhas antigas (último passo)
+
+jobs:
+  revisao-cruzada:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: buscar descrição e revisões do PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$REPO/pulls/$PR" --jq '.body // ""' > corpo.txt
+          gh api "repos/$REPO/pulls/$PR/reviews?per_page=100" \
+            --jq '[.[] | {login: .user.login, body: (.body // ""), tipo: "review", commit_id: .commit_id}]' > revisoes.json
+
+      - name: conferir revisão cruzada
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/revisao-check --corpo corpo.txt --revisoes revisoes.json --head "$HEAD_SHA"
+
+      # A execução disparada pelo push deste commit ficou vermelha (ainda não havia revisão).
+      # Com a revisão aprovando, roda de novo para o PR não mostrar um X vermelho antigo.
+      - name: atualizar execuções vermelhas deste commit
+        if: success() && github.event_name == 'pull_request_review'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh run list -R "$REPO" --workflow revisao.yml --commit "$HEAD_SHA" --status failure \
+            --json databaseId --jq '.[].databaseId' | while read -r id; do
+            gh run rerun "$id" -R "$REPO" || echo "não consegui rodar de novo a execução $id"
+          done

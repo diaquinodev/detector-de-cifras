@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""revisao-check — o PR só fica verde com revisão, do commit atual, de quem não foi o autor.
+
+Uso: python3 revisao-check --corpo corpo.txt --revisoes revisoes.json --head <sha>
+
+corpo.txt     descrição do PR; precisa da linha "Autor: <Claude Code | Codex | Gemini>"
+revisoes.json revisões do PR, em ordem:
+              [{"login": "...", "body": "...", "tipo": "review", "commit_id": "<sha>"}]
+--head        SHA do commit atual do PR; revisão de commit anterior não vale (código novo
+              ainda não foi revisado)
+
+Verde (saída 0) quando, no commit atual:
+- a revisão mais recente com o cabeçalho
+      Revisão por <agente> · autor <agente> · veredito: <Accept | Accept with notes | Revise>
+  vem de um agente diferente do autor, com veredito Accept ou Accept with notes; ou
+- o CodeRabbit publicou revisão sem pendências ("Actionable comments posted: 0").
+"autorrevisão" fica vermelho de propósito: sem outro agente com crédito, o merge é uma
+decisão consciente do usuário. Regras: AGENTS.md do QG, seção "Fluxo de Pull Requests".
+"""
+
+import argparse
+import json
+import re
+import sys
+
+AGENTES = ("claude", "codex", "gemini")
+VEREDITOS = ("accept", "accept with notes", "revise")
+AUTOR = re.compile(r"^\s*\**Autor:?\**\s*:?\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+CABECALHO = re.compile(
+    r"Revis[ãa]o por\s+(?P<revisor>.+?)\s*[·→|-]\s*(?P<autor>autorrevis[ãa]o|autor\s+.+?)"
+    r"\s*[·→|-]\s*veredito:\s*(?P<veredito>[^\n]+)",
+    re.IGNORECASE,
+)
+ACHADOS = re.compile(r"Actionable comments posted:\s*(\d+)", re.IGNORECASE)
+
+
+def agente(texto: str) -> str | None:
+    """Primeiro nome de agente conhecido no texto ("Claude Code" -> "claude")."""
+    for palavra in re.findall(r"[a-zà-ú]+", texto.lower()):
+        if palavra in AGENTES:
+            return palavra
+    return None
+
+
+def veredito_limpo(texto: str) -> str:
+    """'**Accept with notes**.' -> 'accept with notes'."""
+    return re.sub(r"\s+", " ", re.sub(r"[*_`.,;:!]+", " ", texto)).strip().lower()
+
+
+def avaliar(corpo: str, revisoes: list[dict], head: str) -> tuple[bool, str]:
+    m = AUTOR.search(corpo or "")
+    autor = agente(m[1]) if m else None
+    if not autor:
+        return False, 'a descrição do PR precisa da linha "Autor: Claude Code", "Autor: Codex" ou "Autor: Gemini"'
+
+    atuais = [r for r in revisoes if r.get("tipo") == "review" and r.get("commit_id") == head]
+
+    # Só a revisão mais recente do CodeRabbit conta: "0 achados" seguido de "3 achados" não libera.
+    do_coderabbit = [r for r in atuais if r.get("login") == "coderabbitai[bot]"]
+    if do_coderabbit:
+        achados = ACHADOS.search(do_coderabbit[-1].get("body") or "")
+        if achados and int(achados[1]) == 0:
+            return True, "revisão do CodeRabbit sem pendências no commit atual"
+
+    ultima = None
+    for r in atuais:
+        for c in CABECALHO.finditer(r.get("body") or ""):
+            ultima = c
+    if not ultima:
+        antigas = any(CABECALHO.search(r.get("body") or "") for r in revisoes)
+        if antigas:
+            return False, "há revisão, mas não do commit atual: o código novo precisa ser revisado de novo"
+        return False, (f"sem revisão de outro agente (autor: {autor}); publique com "
+                       '"gh pr review <N> --comment" e o cabeçalho "Revisão por X · autor Y · veredito: ..."')
+
+    veredito = veredito_limpo(ultima["veredito"])
+    if veredito not in VEREDITOS:
+        return False, f'veredito "{ultima["veredito"].strip()}" inválido: use Accept, Accept with notes ou Revise'
+    if veredito == "revise":
+        return False, "a revisão mais recente pediu correções (veredito: Revise)"
+    if ultima["autor"].lower().startswith("autorrevis"):
+        return False, ("autorrevisão: nenhum outro agente revisou; o merge fica por decisão "
+                       "consciente do usuário")
+
+    autor_cabecalho = agente(ultima["autor"])
+    if autor_cabecalho != autor:
+        return False, (f'o cabeçalho diz "{ultima["autor"].strip()}", mas o PR é de {autor}: '
+                       "corrija o cabeçalho da revisão")
+
+    revisor = agente(ultima["revisor"])
+    if revisor is None:
+        return False, f'revisor "{ultima["revisor"].strip()}" não é Claude Code, Codex nem Gemini'
+    if revisor == autor:
+        return False, f"o revisor ({revisor}) é o próprio autor; peça a revisão a outro agente"
+    return True, f"revisado por {revisor} (autor: {autor}) no commit atual, veredito: {veredito}"
+
+
+def main() -> int:
+    for fluxo in (sys.stdout, sys.stderr):
+        fluxo.reconfigure(encoding="utf-8")
+    p = argparse.ArgumentParser(description="Confere a revisão cruzada de um PR.")
+    p.add_argument("--corpo", required=True)
+    p.add_argument("--revisoes", required=True)
+    p.add_argument("--head", required=True, help="SHA do commit atual do PR")
+    a = p.parse_args()
+    with open(a.corpo, encoding="utf-8") as f:
+        corpo = f.read()
+    with open(a.revisoes, encoding="utf-8") as f:
+        revisoes = json.load(f)
+    ok, motivo = avaliar(corpo, revisoes, a.head)
+    print(("revisao-check: ok — " if ok else "revisao-check: ERRO — ") + motivo)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

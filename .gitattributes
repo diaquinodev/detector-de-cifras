@@ -1,0 +1,2 @@
+# Fim de linha LF em tudo: scripts sh (scripts/handoff-check) não rodam com CRLF.
+* text=auto eol=lf
