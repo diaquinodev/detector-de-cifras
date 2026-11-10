@@ -7,7 +7,8 @@
   de licença próprio (conferido em 2026-11-10).
 - **Trecho de terceiros:** `_gen_timing_signal` em `btc_src/transformer_modules.py` é adaptado
   do [tensor2tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/layers/common_attention.py)
-  (Apache-2.0), como já estava no original; o arquivo é idêntico ao do empacotamento.
+  (Apache-2.0, texto integral em [`LICENSE-APACHE-2.0`](LICENSE-APACHE-2.0)), como já estava
+  no original; o arquivo é idêntico ao do empacotamento.
 
 ## Alterações locais (em relação ao empacotamento)
 
