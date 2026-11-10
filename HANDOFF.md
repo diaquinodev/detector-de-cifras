@@ -20,14 +20,16 @@ QG: brain/plans/detector-de-cifras/phase-1-estilo-ruff.md
 
 - commit 3: correções manuais (linhas longas, `zip(strict=False)`, `raise ... from`, `_root`); AST igual à de antes em todos os 10 arquivos, descontadas só essas mudanças; `ruff check` limpo
 
+- commit 4: `ruff check` e `ruff format --check` no CI, `ruff==0.17.3` fixado no requirements-test.txt; verificação nova no AGENTS.md e no README
+
 ## Falta
-- commit 4: ruff no CI; PR draft e revisão do Codex
+- PR draft da fase 1 e revisão do Codex
 
 ## Próximo comando
-acrescentar ruff check e ruff format --check ao .github/workflows/ci.yml e ruff ao requirements-test.txt
+abrir o PR draft da fase 1 e pedir revisão cruzada ao Codex
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-10 17:45
+2026-11-10 18:00

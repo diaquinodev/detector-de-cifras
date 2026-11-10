@@ -20,4 +20,6 @@ jobs:
       # Os testes não usam torch nem os pesos dos modelos; o requirements.txt completo
       # (torch, transformers, beat-this) fica para quem roda o detector de verdade.
       - run: pip install -r requirements-test.txt
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
       - run: python -m pytest
