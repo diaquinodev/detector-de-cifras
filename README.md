@@ -46,7 +46,7 @@ script que baixa e prepara os dois arquivos é a fase 2 do plano.
 ## Verificação
 
 ```
-python -m pytest
+python -m ruff check . && python -m ruff format --check . && python -m pytest
 ```
 
-Os testes só precisam de `numpy`, `scipy` e `pytest` (`requirements-test.txt`).
+A verificação só precisa de `numpy`, `scipy`, `pytest` e `ruff` (`requirements-test.txt`).

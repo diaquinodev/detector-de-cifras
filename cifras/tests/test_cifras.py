@@ -12,6 +12,7 @@ import numpy as np
 CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 
+import servir  # noqa: E402
 from beat_detector import decode_bar_positions  # noqa: E402
 from harmonic_structure import (  # noqa: E402
     detect_key_modulation,
@@ -20,10 +21,11 @@ from harmonic_structure import (  # noqa: E402
     override_bar,
     spell_with,
 )
-import servir  # noqa: E402
 
 
-def probabilities_for(size: int, strong: list[int], high: float = 0.9, low: float = 0.05) -> np.ndarray:
+def probabilities_for(
+    size: int, strong: list[int], high: float = 0.9, low: float = 0.05
+) -> np.ndarray:
     values = np.full(size, low)
     values[strong] = high
     return values
@@ -48,7 +50,9 @@ class BarPositionTest(unittest.TestCase):
         self.assertEqual(result.tolist(), strong)
 
     def test_no_one_beat_bar(self):
-        result = decode_bar_positions(probabilities_for(16, [0, 4, 5, 6, 7, 8, 12], high=0.98, low=0.02), 4)
+        result = decode_bar_positions(
+            probabilities_for(16, [0, 4, 5, 6, 7, 8, 12], high=0.98, low=0.02), 4
+        )
         self.assertTrue(np.all(np.diff(result) >= 2))
 
     def test_neutral_edges_follow_the_grid(self):
@@ -97,7 +101,9 @@ class ServerGuardTest(unittest.TestCase):
         self.assertFalse(servir.origin_allowed(None))
 
     def test_content_type(self):
-        self.assertTrue(servir.content_type_is("application/json; charset=utf-8", "application/json"))
+        self.assertTrue(
+            servir.content_type_is("application/json; charset=utf-8", "application/json")
+        )
         self.assertFalse(servir.content_type_is("text/plain", "application/json"))
 
     def test_youtube_is_off_by_default(self):
@@ -155,10 +161,20 @@ class PageContractTest(unittest.TestCase):
 
 class ChordEditTest(unittest.TestCase):
     def test_replaces_one_chord_and_keeps_the_rest(self):
-        data = {"compassos": [{"bar": 2, "start": 1, "end": 2, "chords": ["C", "G"], "events": [
-            {"chord": "C", "start": 1, "end": 1.5},
-            {"chord": "G", "start": 1.5, "end": 2},
-        ]}]}
+        data = {
+            "compassos": [
+                {
+                    "bar": 2,
+                    "start": 1,
+                    "end": 2,
+                    "chords": ["C", "G"],
+                    "events": [
+                        {"chord": "C", "start": 1, "end": 1.5},
+                        {"chord": "G", "start": 1.5, "end": 2},
+                    ],
+                }
+            ]
+        }
         servir.apply_chord_edit(data, 2, 1, "D7")
         self.assertEqual(data["compassos"][0]["chords"], ["C", "D7"])
         self.assertEqual(data["compassos"][0]["events"][0]["chord"], "C")
@@ -166,7 +182,12 @@ class ChordEditTest(unittest.TestCase):
 
     def test_rejects_a_chord_that_is_not_a_symbol(self):
         with self.assertRaises(ValueError):
-            servir.apply_chord_edit({"compassos": [{"bar": 1, "chords": ["C"], "events": [{"chord": "C"}]}]}, 1, 0, "alert(1)")
+            servir.apply_chord_edit(
+                {"compassos": [{"bar": 1, "chords": ["C"], "events": [{"chord": "C"}]}]},
+                1,
+                0,
+                "alert(1)",
+            )
 
 
 class SpellingTest(unittest.TestCase):
@@ -198,20 +219,27 @@ class KeyFitTest(unittest.TestCase):
 class ModulationTest(unittest.TestCase):
     def test_minor_key_iv_is_not_a_modulation(self):
         loop = ["Bm", "Em7", "F#7", "Bm", "G", "Em7", "A", "F#7"]
-        bars = [{"chords": [chord], "start": float(i), "end": float(i + 1)} for i, chord in enumerate(loop * 5)]
+        bars = [
+            {"chords": [chord], "start": float(i), "end": float(i + 1)}
+            for i, chord in enumerate(loop * 5)
+        ]
         self.assertIsNone(detect_key_modulation(bars, 11, "menor"))
 
     def test_half_step_up_in_major_is_found(self):
         home = ["Fmaj7", "G", "Em7", "Am7"] * 7
         up = ["F#maj7", "G#", "Fm7", "A#m7"] * 4
-        bars = [{"chords": [chord], "start": float(i), "end": float(i + 1)} for i, chord in enumerate(home + up)]
+        bars = [
+            {"chords": [chord], "start": float(i), "end": float(i + 1)}
+            for i, chord in enumerate(home + up)
+        ]
         found = detect_key_modulation(bars, 0, "maior")
         self.assertEqual((found["new_tonic"], found["semitones"]), (1, 1))
 
 
 class ChordOnsetTest(unittest.TestCase):
     def setUp(self):
-        from analyze import PITCHES_SHARP, btc_bars
+        from analyze import btc_bars
+        from constants import PITCHES_SHARP
 
         self.names = PITCHES_SHARP
         self.btc_bars = btc_bars
@@ -262,7 +290,8 @@ class RootSupportTest(unittest.TestCase):
     """O croma é (12, tempos). Do tempo 12 em diante a coluna tem de valer."""
 
     def bars_for(self, chroma):
-        from analyze import PITCHES_SHARP, btc_bars
+        from analyze import btc_bars
+        from constants import PITCHES_SHARP
 
         beats = np.arange(0.0, 8.01, 0.5)
         local = [{"label": "C", "confidence": 0.8} for _ in range(beats.size)]
@@ -297,7 +326,8 @@ class RootSupportTest(unittest.TestCase):
         self.assertEqual(self.bars_for(chroma), ["C", "G", "C"])
 
     def test_confident_change_survives_a_quiet_root(self):
-        from analyze import PITCHES_SHARP, btc_bars
+        from analyze import btc_bars
+        from constants import PITCHES_SHARP
 
         beats = np.arange(0.0, 8.01, 0.5)
         chroma = np.zeros((12, beats.size))
@@ -324,7 +354,7 @@ class RootSupportTest(unittest.TestCase):
 
 class SlashBassTest(unittest.TestCase):
     def bass(self, notes, confidence=0.95):
-        from analyze import interval_bass
+        from btc_align import interval_bass
 
         beats = np.arange(0.0, 2.0, 0.5)
         return interval_bass(0.0, 2.0, beats, np.asarray(notes), np.full(len(notes), confidence))
@@ -368,7 +398,7 @@ class SavedChartsTest(unittest.TestCase):
                     self.assertEqual([event["chord"] for event in events], bar["chords"])
                     self.assertAlmostEqual(events[0]["start"], bar["start"], places=2)
                     self.assertAlmostEqual(events[-1]["end"], bar["end"], places=2)
-                    for left, right in zip(events, events[1:]):
+                    for left, right in zip(events, events[1:], strict=False):
                         self.assertAlmostEqual(left["end"], right["start"], places=2)
 
 

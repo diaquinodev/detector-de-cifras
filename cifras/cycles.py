@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import Counter
 
 import numpy as np
-
 from constants import (
     CONSECUTIVE_SIM,
     CYCLE_REPEAT_SIM,
@@ -30,7 +29,7 @@ def canonical_chord_choice(bars_at_slot: list[dict], sigs_at_slot: list[dict]) -
     """Escolhe o acorde representativo de uma posição dentro de um ciclo repetido."""
     root_weights: Counter[int] = Counter()
     chord_weights: Counter[tuple[str, ...]] = Counter()
-    for bar, sig in zip(bars_at_slot, sigs_at_slot):
+    for bar, sig in zip(bars_at_slot, sigs_at_slot, strict=False):
         if sig["root"] is None:
             continue
         weight = max(0.15, float(bar.get("confidence", 0.6)))
@@ -65,7 +64,9 @@ def _window_repeats_score(sigs: list[dict], start: int, period: int = 4) -> tupl
         if abs(pos - start) < period:
             pos += 1
             continue
-        sim = float(np.mean([bar_similarity(sigs[start + s], sigs[pos + s]) for s in range(period)]))
+        sim = float(
+            np.mean([bar_similarity(sigs[start + s], sigs[pos + s]) for s in range(period)])
+        )
         if sim >= CYCLE_REPEAT_SIM:
             matches += 1
             sims.append(sim)
@@ -91,8 +92,12 @@ def _block(start: int, end: int, kind: str, sigs: list[dict]) -> dict:
         "period": end - start,
         "kind": kind,
         "roots": () if silent else tuple(sigs[k]["root"] for k in range(start, end)),
-        "romans": ("N",) * (end - start) if silent else tuple(sigs[k]["roman"] for k in range(start, end)),
-        "functions": ("N",) * (end - start) if silent else tuple(sigs[k]["function"] for k in range(start, end)),
+        "romans": ("N",) * (end - start)
+        if silent
+        else tuple(sigs[k]["roman"] for k in range(start, end)),
+        "functions": ("N",) * (end - start)
+        if silent
+        else tuple(sigs[k]["function"] for k in range(start, end)),
     }
 
 
@@ -135,7 +140,9 @@ def _pickup_or_turnaround(sigs: list[dict], idx: int) -> dict | None:
         return None
     here_matches, here_sim = _window_repeats_score(sigs, idx, 4)
     shift1_matches, shift1_sim = _window_repeats_score(sigs, idx + 1, 4)
-    shift2_matches, shift2_sim = _window_repeats_score(sigs, idx + 2, 4) if idx + 6 <= n else (0, 0.0)
+    shift2_matches, shift2_sim = (
+        _window_repeats_score(sigs, idx + 2, 4) if idx + 6 <= n else (0, 0.0)
+    )
     if (
         shift1_matches >= 2
         and (
@@ -261,7 +268,10 @@ def _harmonize_outliers(
             for s in range(period):
                 bar = bars[b0 + s]
                 target = canonical_chords[s]
-                if slot_sims[s] < OUTLIER_SIM and float(bar.get("confidence", 0.0)) < OUTLIER_CONFIDENCE:
+                if (
+                    slot_sims[s] < OUTLIER_SIM
+                    and float(bar.get("confidence", 0.0)) < OUTLIER_CONFIDENCE
+                ):
                     override_bar(bar, target, "consenso do ciclo")
                 elif len(bar.get("chords") or []) == 2 and len(target) == 1:
                     c0 = parse_chord_symbol(bar["chords"][0])
@@ -413,7 +423,9 @@ def _catalog_families(
 
 
 def _rename_cycles(pattern_catalog: list[dict], blocks: list[dict]) -> None:
-    pattern_catalog.sort(key=lambda item: (item["repeticoes"] * item["compassos_por_ciclo"]), reverse=True)
+    pattern_catalog.sort(
+        key=lambda item: item["repeticoes"] * item["compassos_por_ciclo"], reverse=True
+    )
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     id_map = {}
     for rank, item in enumerate(pattern_catalog):

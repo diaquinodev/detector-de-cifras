@@ -227,7 +227,16 @@ MAJOR_FUNCTIONS = {
     (9, "maj"): ("V/ii", "D2"),
     (0, "dom"): ("V7/IV", "D2"),
 }
-DIATONIC_MAJOR = {(0, "maj"), (2, "min"), (4, "min"), (5, "maj"), (7, "maj"), (7, "dom"), (9, "min"), (11, "dim")}
+DIATONIC_MAJOR = {
+    (0, "maj"),
+    (2, "min"),
+    (4, "min"),
+    (5, "maj"),
+    (7, "maj"),
+    (7, "dom"),
+    (9, "min"),
+    (11, "dim"),
+}
 DIATONIC_MINOR = {
     (0, "min"),
     (2, "dim"),

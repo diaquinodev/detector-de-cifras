@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from chords import chord_root_name, profile_scores
 from constants import (
     BASS_INTERVAL_PAD_S,
@@ -51,7 +50,9 @@ def btc_parts(raw: str, names: list[str]) -> tuple[str, int | None, str]:
     return names[root] + suffix, root, suffix
 
 
-def timeline_vote(timeline: list[dict], start: float, end: float) -> tuple[str, float, float, float]:
+def timeline_vote(
+    timeline: list[dict], start: float, end: float
+) -> tuple[str, float, float, float]:
     duration = max(end - start, EPS)
     votes: dict[str, float] = {}
     confidence_sum: dict[str, float] = {}
@@ -64,7 +65,9 @@ def timeline_vote(timeline: list[dict], start: float, end: float) -> tuple[str, 
             confidence_sum[chord] = confidence_sum.get(chord, 0.0) + overlap * float(
                 segment.get("confidence", 1.0)
             )
-            margin_sum[chord] = margin_sum.get(chord, 0.0) + overlap * float(segment.get("margin", 1.0))
+            margin_sum[chord] = margin_sum.get(chord, 0.0) + overlap * float(
+                segment.get("margin", 1.0)
+            )
     if not votes:
         return "X", 0.0, 0.0, 0.0
     chord, won = max(votes.items(), key=lambda item: item[1])
@@ -85,15 +88,23 @@ def interval_bass(
 ) -> int | None:
     """Sem baixista, o detector ouve a corda grave da voicing; só um pedal sustentado vira barra."""
     inside = [
-        index for index, beat in enumerate(beat_times) if start - BASS_INTERVAL_PAD_S <= float(beat) < end + BASS_INTERVAL_PAD_S
+        index
+        for index, beat in enumerate(beat_times)
+        if start - BASS_INTERVAL_PAD_S <= float(beat) < end + BASS_INTERVAL_PAD_S
     ]
     notes = [
-        int(bass_pc[index]) for index in inside if bass_pc[index] >= 0 and bass_conf[index] >= SLASH_BASS_CONFIDENCE
+        int(bass_pc[index])
+        for index in inside
+        if bass_pc[index] >= 0 and bass_conf[index] >= SLASH_BASS_CONFIDENCE
     ]
     if len(notes) < BASS_MIN_NOTES:
         return None
     common = int(np.bincount(notes, minlength=12).argmax())
-    return common if notes.count(common) >= max(BASS_MIN_NOTES, SLASH_BASS_SHARE * len(inside)) else None
+    return (
+        common
+        if notes.count(common) >= max(BASS_MIN_NOTES, SLASH_BASS_SHARE * len(inside))
+        else None
+    )
 
 
 def btc_root_support(raw: str, chroma: np.ndarray | None) -> float:
@@ -121,7 +132,9 @@ def spell_btc(raw: str, names: list[str], bass: int | None) -> str:
     return label
 
 
-def model_change_time(timeline: list[dict], raw: str, left: float, right: float, fallback: float) -> float:
+def model_change_time(
+    timeline: list[dict], raw: str, left: float, right: float, fallback: float
+) -> float:
     """Devolve o início que o modelo marcou, quando ele cai longe do tempo."""
     covering_start = None
     next_start = None
@@ -130,7 +143,9 @@ def model_change_time(timeline: list[dict], raw: str, left: float, right: float,
             continue
         seg_start = float(segment["start"])
         seg_end = float(segment["end"])
-        if seg_start <= fallback < seg_end and (covering_start is None or seg_start > covering_start):
+        if seg_start <= fallback < seg_end and (
+            covering_start is None or seg_start > covering_start
+        ):
             covering_start = seg_start
         if fallback < seg_start < right and (next_start is None or seg_start < next_start):
             next_start = seg_start
@@ -150,7 +165,9 @@ def bar_interior_points(start: float, end: float, beat_times: np.ndarray) -> lis
     return [start, *inside, end]
 
 
-def chroma_at_beat(beat_chroma: np.ndarray | None, beat_times: np.ndarray, left: float) -> tuple[np.ndarray | None, int]:
+def chroma_at_beat(
+    beat_chroma: np.ndarray | None, beat_times: np.ndarray, left: float
+) -> tuple[np.ndarray | None, int]:
     beat_index = int(np.argmin(np.abs(beat_times - left))) if beat_times.size else -1
     chroma = None
     if (
@@ -323,7 +340,7 @@ def btc_bars(
         points = bar_interior_points(start, end, beat_times)
         whole = timeline_vote(timeline, start, end)
         candidates = []
-        for left, right in zip(points, points[1:]):
+        for left, right in zip(points, points[1:], strict=False):
             candidate, previous_raw = vote_interval(
                 timeline,
                 left,

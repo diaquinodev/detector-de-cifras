@@ -21,7 +21,9 @@ class ChromaTest(unittest.TestCase):
         self.assertEqual(note_name(A4_HZ, PITCHES_SHARP), "A")
 
     def test_exact_bass_notes_keep_a440(self):
-        reference, cents = tuning_from_bass(np.array([110.0, 220.0, 440.0]), np.array([0.9, 0.9, 0.9]))
+        reference, cents = tuning_from_bass(
+            np.array([110.0, 220.0, 440.0]), np.array([0.9, 0.9, 0.9])
+        )
         self.assertEqual(cents, 0.0)
         self.assertAlmostEqual(reference, A4_HZ, places=1)
 

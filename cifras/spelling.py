@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from constants import (
     DEGREE_OF_INTERVAL,
     DIATONIC_MAJOR,
@@ -36,7 +34,11 @@ def key_spelling(tonic: int, mode: str) -> list[str]:
     """
     minor = str(mode).lower().startswith("men")
     tonic_name = (MINOR_TONIC_NAMES if minor else MAJOR_TONIC_NAMES)[tonic % 12]
-    fallback = PC_NAMES_FLAT if "b" in tonic_name or (minor and tonic_name in {"C", "D", "F", "G"}) else PC_NAMES_SHARP
+    fallback = (
+        PC_NAMES_FLAT
+        if "b" in tonic_name or (minor and tonic_name in {"C", "D", "F", "G"})
+        else PC_NAMES_SHARP
+    )
     tonic_letter = LETTERS.index(tonic_name[0])
     names = []
     for pc in range(12):
@@ -60,7 +62,11 @@ def spell_with(chord: str, names: list[str]) -> str:
 def respell_bars(bars: list[dict], tonic: int, mode: str, modulation: dict | None) -> None:
     """Reescreve as cifras com a grafia do tom final, e do tom novo depois da modulação."""
     home = key_spelling(tonic, mode)
-    moved = key_spelling(modulation["new_tonic"], modulation.get("new_mode", "maior")) if modulation else home
+    moved = (
+        key_spelling(modulation["new_tonic"], modulation.get("new_mode", "maior"))
+        if modulation
+        else home
+    )
     start = modulation["start_bar"] if modulation else len(bars)
     for index, bar in enumerate(bars):
         names = moved if index >= start else home
@@ -239,7 +245,11 @@ def detect_key_modulation(bars: list[dict], tonic: int, mode: str) -> dict | Non
         return None
     start_search = int(n * MODULATION_SEARCH_FRACTION)
     minor = str(mode).lower().startswith("men")
-    diatonic = DIATONIC_MINOR if minor else {(0, "maj"), (2, "min"), (4, "min"), (5, "maj"), (7, "maj"), (7, "dom"), (9, "min")}
+    diatonic = (
+        DIATONIC_MINOR
+        if minor
+        else {(0, "maj"), (2, "min"), (4, "min"), (5, "maj"), (7, "maj"), (7, "dom"), (9, "min")}
+    )
 
     best_mod = None
     for split_idx in range(start_search, n - MODULATION_TAIL_BARS):

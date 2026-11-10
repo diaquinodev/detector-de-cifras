@@ -36,7 +36,7 @@ Para terminar: "fechar sessão" (HANDOFF atualizado, commit, push e PR com o pas
 ## Verificação
 
 ```
-python -m pytest
+python -m ruff check . && python -m ruff format --check . && python -m pytest
 ```
 
 ## Dados e segredos

@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy import signal
-from scipy.ndimage import uniform_filter1d
-
 from audio import magnitude
 from constants import (
     BAR_OFFSET_LAG_S,
@@ -46,6 +43,8 @@ from constants import (
     TEMPO_MAX_BPM,
     TEMPO_MIN_BPM,
 )
+from scipy import signal
+from scipy.ndimage import uniform_filter1d
 
 
 def onset_envelope(magnitude_spectrum: np.ndarray) -> np.ndarray:
@@ -76,8 +75,10 @@ def tempo_from_onset(envelope: np.ndarray) -> tuple[float, int]:
     window = autocorr[min_lag : max_lag + 1]
     lag = min_lag + int(np.argmax(window))
     doubled = lag * 2
-    if doubled <= max_lag and autocorr[doubled] > autocorr[lag] * DOUBLE_LAG_RATIO and lag < int(
-        60 / DOUBLE_LAG_BPM * SAMPLE_RATE / HOP
+    if (
+        doubled <= max_lag
+        and autocorr[doubled] > autocorr[lag] * DOUBLE_LAG_RATIO
+        and lag < int(60 / DOUBLE_LAG_BPM * SAMPLE_RATE / HOP)
     ):
         lag = doubled
     bpm = 60.0 * SAMPLE_RATE / HOP / lag
@@ -115,7 +116,9 @@ def beat_track(envelope: np.ndarray, period: int) -> np.ndarray:
     return np.asarray(frames, dtype=int)
 
 
-def prefer_musical_pulse(beat_times: np.ndarray, accent: np.ndarray, tempo: float) -> tuple[np.ndarray, float, bool]:
+def prefer_musical_pulse(
+    beat_times: np.ndarray, accent: np.ndarray, tempo: float
+) -> tuple[np.ndarray, float, bool]:
     if tempo < COLLAPSE_TEMPO_BPM or beat_times.size < COLLAPSE_MIN_BEATS:
         return beat_times, tempo, False
     even = float(np.mean(accent[0::2]))
@@ -192,7 +195,9 @@ def neural_meter(pulse: dict) -> dict:
     }
 
 
-def bar_starts(steps: int, beats_per_bar: int, phase: int, downbeats: np.ndarray | None = None) -> np.ndarray:
+def bar_starts(
+    steps: int, beats_per_bar: int, phase: int, downbeats: np.ndarray | None = None
+) -> np.ndarray:
     if downbeats is not None:
         starts = np.asarray(downbeats, dtype=int)
         starts = starts[(starts >= 0) & (starts < steps)]
@@ -203,7 +208,9 @@ def bar_starts(steps: int, beats_per_bar: int, phase: int, downbeats: np.ndarray
     return starts
 
 
-def harmony_downbeat(beat_chroma: np.ndarray, energy: np.ndarray, beats_per_bar: int, accent_phase: int) -> int:
+def harmony_downbeat(
+    beat_chroma: np.ndarray, energy: np.ndarray, beats_per_bar: int, accent_phase: int
+) -> int:
     """Entre as fases do 4/4, prefere a que segura uma fundamental por compasso.
 
     O grave continua mandando quando a diferença é pequena. Assim um compasso
@@ -236,7 +243,10 @@ def harmony_downbeat(beat_chroma: np.ndarray, energy: np.ndarray, beats_per_bar:
                 same += 1
         scores.append(same)
     chosen = int(np.argmax(scores))
-    if scores[chosen] < scores[accent_phase] * HARMONY_PHASE_RATIO or scores[chosen] < scores[accent_phase] + HARMONY_PHASE_EXTRA:
+    if (
+        scores[chosen] < scores[accent_phase] * HARMONY_PHASE_RATIO
+        or scores[chosen] < scores[accent_phase] + HARMONY_PHASE_EXTRA
+    ):
         return accent_phase
     return chosen
 
@@ -274,7 +284,7 @@ def frame_peak(autocorr: np.ndarray, lag: float) -> float:
 def bass_energy(samples: np.ndarray, beat_times: np.ndarray) -> np.ndarray:
     kernel = signal.firwin(BASS_FIR_TAPS, BASS_FIR_HZ, fs=SAMPLE_RATE)
     bass = signal.lfilter(kernel, [1.0], samples)
-    squared = bass ** 2
+    squared = bass**2
     window = int(BASS_ENERGY_WINDOW_S * SAMPLE_RATE)
     energy = uniform_filter1d(squared, size=max(1, window))
     indexes = np.clip((beat_times * SAMPLE_RATE).astype(int), 0, energy.size - 1)
@@ -288,7 +298,7 @@ def bar_line_offset(samples: np.ndarray, beat_times: np.ndarray) -> float:
     from chroma import bass_bandpass
 
     low = bass_bandpass(samples)
-    energy = uniform_filter1d(low ** 2, size=max(1, int(BAR_OFFSET_SMOOTH_S * SAMPLE_RATE)))
+    energy = uniform_filter1d(low**2, size=max(1, int(BAR_OFFSET_SMOOTH_S * SAMPLE_RATE)))
     radius = int(BAR_OFFSET_RADIUS_S * SAMPLE_RATE)
     errors = []
     for beat in beat_times[BAR_OFFSET_SKIP:-BAR_OFFSET_SKIP]:

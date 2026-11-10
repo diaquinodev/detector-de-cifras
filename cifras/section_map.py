@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import Counter
 
 import numpy as np
-
 from constants import (
     BRIDGE_FRACTION,
     CHEST_ONSET_CANDIDATES,
@@ -52,7 +51,11 @@ def _refine_key(bars: list[dict], key: dict) -> tuple[int, str, dict | None]:
 def _vocal_onset_from_profile(vocal_presence: np.ndarray, vocal_chest: np.ndarray, n: int) -> int:
     peak_v = float(np.max(vocal_presence)) if vocal_presence.size else 0.0
     active_v = vocal_presence[vocal_presence > peak_v * VOCAL_PEAK_FRACTION]
-    thresh = float(np.percentile(active_v, VOCAL_PERCENTILE) * VOCAL_PERCENTILE_GAIN) if active_v.size >= 4 else peak_v * 0.5
+    thresh = (
+        float(np.percentile(active_v, VOCAL_PERCENTILE) * VOCAL_PERCENTILE_GAIN)
+        if active_v.size >= 4
+        else peak_v * 0.5
+    )
     vocal_onset_bar = 0
     for idx in range(n - 1):
         if vocal_presence[idx] >= thresh and vocal_presence[idx + 1] >= thresh * VOCAL_NEXT_RATIO:
@@ -96,7 +99,9 @@ def _snap_vocal_onset(blocks: list[dict], vocal_onset_bar: int) -> int:
 
 
 def _primary_pattern(blocks: list[dict], vocal_onset_bar: int) -> str:
-    post_intro_blocks = [b for b in blocks if b["end_bar"] > vocal_onset_bar and b["kind"] != "silence"]
+    post_intro_blocks = [
+        b for b in blocks if b["end_bar"] > vocal_onset_bar and b["kind"] != "silence"
+    ]
     pattern_counts: Counter[str] = Counter()
     for b in post_intro_blocks:
         if b["kind"] == "cycle":
@@ -134,7 +139,11 @@ def _label_block(
         next_block = blocks[idx_b + 1] if idx_b + 1 < len(blocks) else None
         if block["kind"] == "turnaround" and all(f == "D" for f in functions):
             return ("refrão" if seen_verse else "verso"), seen_verse
-        if block["kind"] == "pickup" and next_block and next_block.get("pattern_id") != primary_pattern:
+        if (
+            block["kind"] == "pickup"
+            and next_block
+            and next_block.get("pattern_id") != primary_pattern
+        ):
             return ("pré-refrão" if seen_verse else "verso"), seen_verse
         if labeled_blocks:
             return labeled_blocks[-1]["name"], seen_verse
@@ -191,7 +200,12 @@ def _smooth_short_islands(labeled_blocks: list[dict]) -> None:
         curr_s = labeled_blocks[idx_b]["name"]
         next_s = labeled_blocks[idx_b + 1]["name"]
         span = labeled_blocks[idx_b]["end_bar"] - labeled_blocks[idx_b]["start_bar"]
-        if prev_s == next_s and curr_s != prev_s and span <= SHORT_SECTION_SPAN and curr_s not in {"pré-refrão"}:
+        if (
+            prev_s == next_s
+            and curr_s != prev_s
+            and span <= SHORT_SECTION_SPAN
+            and curr_s not in {"pré-refrão"}
+        ):
             labeled_blocks[idx_b]["name"] = prev_s
 
 
@@ -251,7 +265,10 @@ def _sections_out(merged_sections: list[dict]) -> list[dict]:
                     {
                         "bar": bar["bar"],
                         "chords": bar["chords"],
-                        "chords_sharp": [respell_chord_symbol(c, prefer_sharp=True) for c in (bar.get("chords") or ["N"])],
+                        "chords_sharp": [
+                            respell_chord_symbol(c, prefer_sharp=True)
+                            for c in (bar.get("chords") or ["N"])
+                        ],
                         "events": bar.get("events") or [],
                         "confidence": bar["confidence"],
                     }

@@ -5,9 +5,6 @@ from __future__ import annotations
 import sys
 
 import numpy as np
-from scipy import signal
-from scipy.ndimage import uniform_filter1d
-
 from constants import (
     BAR_OFFSET_PRINT_MS,
     CHEST_BAND,
@@ -32,13 +29,15 @@ from constants import (
     SINGING_PERCENTILE_GAIN,
     VOICE_REENTRY_QUIET,
 )
+from scipy import signal
+from scipy.ndimage import uniform_filter1d
 
 
 def band_envelope(samples: np.ndarray, low: float, high: float) -> np.ndarray:
     sos = signal.butter(4, [low, high], btype="band", fs=SAMPLE_RATE, output="sos")
     filtered = signal.sosfiltfilt(sos, samples)
     window = max(1, int(ENVELOPE_WINDOW_S * SAMPLE_RATE))
-    power = uniform_filter1d(filtered ** 2, size=window)
+    power = uniform_filter1d(filtered**2, size=window)
     return np.sqrt(np.maximum(power, 0.0))
 
 
@@ -95,7 +94,9 @@ def instrumental_floor(presence: np.ndarray, onset: int) -> float:
     return float(np.median(active))
 
 
-def voice_reentries(presence: np.ndarray, floor: float, start_at: int, min_quiet: int = VOICE_REENTRY_QUIET) -> list[int]:
+def voice_reentries(
+    presence: np.ndarray, floor: float, start_at: int, min_quiet: int = VOICE_REENTRY_QUIET
+) -> list[int]:
     found = []
     quiet = 0
     for index in range(start_at, presence.size):
@@ -160,7 +161,9 @@ def fallback_chorus(roots: list[str], onset: int) -> int | None:
     return None if best is None else best[1]
 
 
-def sections_from_voice(bars: list[dict], presence: np.ndarray, chest: np.ndarray) -> tuple[list[dict], dict, list[dict]]:
+def sections_from_voice(
+    bars: list[dict], presence: np.ndarray, chest: np.ndarray
+) -> tuple[list[dict], dict, list[dict]]:
     roots = [bar.get("root") or "?" for bar in bars]
     threshold = singing_threshold(presence)
     onset = first_sustained(presence, threshold)
@@ -195,7 +198,7 @@ def sections_from_voice(bars: list[dict], presence: np.ndarray, chest: np.ndarra
     names = []
     state = "introdução"
     chorus_notes: set[str] = set()
-    for index, root in enumerate(roots):
+    for index, _root in enumerate(roots):
         if index >= rest:
             state = "outro"
             chorus_notes = set()
@@ -222,7 +225,9 @@ def sections_from_voice(bars: list[dict], presence: np.ndarray, chest: np.ndarra
             merged[-1]["bars"].append(bar)
             merged[-1]["repeats"] += 1
             continue
-        merged.append({"name": name, "start": bar["start"], "end": bar["end"], "repeats": 1, "bars": [bar]})
+        merged.append(
+            {"name": name, "start": bar["start"], "end": bar["end"], "repeats": 1, "bars": [bar]}
+        )
     sections = []
     for item in merged:
         sections.append(
@@ -279,7 +284,9 @@ def clock(seconds: float) -> str:
     return f"{whole // 60}:{whole % 60:02d}"
 
 
-def render_header(song: str, pulse: dict, meter: dict, key: dict, voice: dict, ruled: int) -> list[str]:
+def render_header(
+    song: str, pulse: dict, meter: dict, key: dict, voice: dict, ruled: int
+) -> list[str]:
     lines = [
         song,
         f"Tom: {key['name']} {key['mode']}",
@@ -287,13 +294,16 @@ def render_header(song: str, pulse: dict, meter: dict, key: dict, voice: dict, r
     if key.get("modulacao"):
         mod = key["modulacao"]
         lines.append(
-            f"Modulação: sobe {mod['semitones']} semitom(ns) para {mod['new_name_flat']} / {mod['new_name_sharp']} "
-            f"{mod.get('new_mode', 'maior')} em {clock(mod['start_s'])} (compasso {mod['start_bar'] + 1})."
+            f"Modulação: sobe {mod['semitones']} semitom(ns) para "
+            f"{mod['new_name_flat']} / {mod['new_name_sharp']} "
+            f"{mod.get('new_mode', 'maior')} em {clock(mod['start_s'])} "
+            f"(compasso {mod['start_bar'] + 1})."
         )
     if key.get("correcao_tom"):
         fix = key["correcao_tom"]
         lines.append(
-            f"O áudio apontava {fix['antes']}, mas só {round(fix['encaixe_antes'] * 100)}% dos acordes cabem nele; "
+            f"O áudio apontava {fix['antes']}, mas só {round(fix['encaixe_antes'] * 100)}% "
+            "dos acordes cabem nele; "
             f"{round(fix['encaixe_depois'] * 100)}% cabem em {key['name']} {key['mode']}."
         )
     if key.get("rival"):
@@ -304,58 +314,81 @@ def render_header(song: str, pulse: dict, meter: dict, key: dict, voice: dict, r
     elif key.get("quinto"):
         fifth = key["quinto"]
         lines.append(
-            f"{fifth['name']} {fifth['mode']} marca {round(fifth['relacao'] * 100)}%. O perfil de presença não troca o centro."
+            f"{fifth['name']} {fifth['mode']} marca {round(fifth['relacao'] * 100)}%. "
+            "O perfil de presença não troca o centro."
         )
     lines.append(f"Pulsação: {pulse['bpm']} BPM")
     if meter.get("source") == "beat_this":
         lines.append(
-            f"Compasso: {meter['beats_per_bar']} tempos por compasso. A rede não separa 6/8 de 2/4, "
+            f"Compasso: {meter['beats_per_bar']} tempos por compasso. "
+            "A rede não separa 6/8 de 2/4, "
             "então a fórmula não é confirmada."
         )
         grid = "Grade: Beat This! marca pulsos e tempos fortes; um Viterbi segura o compasso."
         if pulse.get("inferred_downbeats"):
-            grid += f" {pulse['inferred_downbeats']} tempo(s) 1 vieram da continuidade, sem marca da rede."
+            grid += (
+                f" {pulse['inferred_downbeats']} tempo(s) 1 vieram da continuidade, "
+                "sem marca da rede."
+            )
         if pulse.get("rejected_downbeats"):
-            grid += f" {pulse['rejected_downbeats']} marca(s) da rede fora do tempo 1 foram ignoradas."
+            grid += (
+                f" {pulse['rejected_downbeats']} marca(s) da rede fora do tempo 1 foram ignoradas."
+            )
         if pulse.get("irregular_bars"):
             grid += f" {pulse['irregular_bars']} compasso(s) têm outra duração."
         if pulse.get("extrapolated_beats"):
-            grid += f" {pulse['extrapolated_beats']} pulso(s) nas pontas foram estendidos no mesmo andamento."
+            grid += (
+                f" {pulse['extrapolated_beats']} pulso(s) nas pontas foram estendidos "
+                "no mesmo andamento."
+            )
         lines.append(grid)
     else:
-        lines.append(f"Compasso: {meter['numerator']}/{meter['denominator']} (estimativa heurística, não confirmada)")
+        lines.append(
+            f"Compasso: {meter['numerator']}/{meter['denominator']} "
+            "(estimativa heurística, não confirmada)"
+        )
     if meter.get("phase_from_harmony"):
         lines.append("O tempo 1 acompanha a troca de acorde. O grave sozinho marcava outro tempo.")
     if pulse.get("compasso_ms") and abs(int(pulse["compasso_ms"])) >= BAR_OFFSET_PRINT_MS:
         shift = int(pulse["compasso_ms"])
         if shift < 0:
-            lines.append(f"A troca do compasso acompanha o grave, {-shift} ms antes do ataque agudo.")
+            lines.append(
+                f"A troca do compasso acompanha o grave, {-shift} ms antes do ataque agudo."
+            )
         else:
-            lines.append(f"A troca do compasso acompanha o grave, {shift} ms depois do ataque agudo.")
+            lines.append(
+                f"A troca do compasso acompanha o grave, {shift} ms depois do ataque agudo."
+            )
     if pulse["collapsed_eighths"]:
         lines.append("A grade fina caiu na colcheia. O pulso abaixo é o tempo acentuado.")
     if voice.get("entrada_verso_s") is not None:
         if voice.get("detector", "").startswith("all-in-one"):
             lines.append(
-                f"Estrutura: All-In-One marca o primeiro verso em {clock(voice['entrada_verso_s'])}."
+                "Estrutura: All-In-One marca o primeiro verso em "
+                f"{clock(voice['entrada_verso_s'])}."
             )
         else:
             lines.append(f"A voz entra em {clock(voice['entrada_verso_s'])} e abre o verso.")
     if voice.get("entrada_refrao_s") is not None and voice.get("refrao_pela_dinamica"):
         lines.append(
-            f"O refrão entra em {clock(voice['entrada_refrao_s'])}, quando a dinâmica da voz sobe e se sustenta."
+            f"O refrão entra em {clock(voice['entrada_refrao_s'])}, "
+            "quando a dinâmica da voz sobe e se sustenta."
         )
     lines.append(f"Afinação: {key['reference']:.1f} Hz")
     if key.get("detector") == "btc":
         lines.append(
-            "Acordes: estimativa do Transformer BTC (170 classes), com a afinação estimada aplicada; "
+            "Acordes: estimativa do Transformer BTC (170 classes), "
+            "com a afinação estimada aplicada; "
             "ainda sem avaliação contra cifras de referência."
         )
     else:
-        lines.append("Acordes: gabarito NNLS local (fallback). O harmônico volta para a nota que o gerou.")
+        lines.append(
+            "Acordes: gabarito NNLS local (fallback). O harmônico volta para a nota que o gerou."
+        )
     if key.get("detector") == "btc":
         lines.append(
-            "Cifra: uma troca que o modelo sustenta guarda o instante dele quando cai fora do tempo; "
+            "Cifra: uma troca que o modelo sustenta guarda o instante dele "
+            "quando cai fora do tempo; "
             "um piscar curto continua no tempo."
         )
     else:
@@ -391,8 +424,10 @@ def render_sections(sections: list[dict]) -> list[str]:
             meta.append(str(section["graus"]))
         if section.get("cadencia") and section.get("cadencia") != "silêncio":
             meta.append(str(section["cadencia"]))
-        suffix = f"  [{ ' · '.join(meta) }]" if meta else ""
-        lines.append(f"{section['name']}  {clock(section['start'])}–{clock(section['end'])}{suffix}")
+        suffix = f"  [{' · '.join(meta)}]" if meta else ""
+        lines.append(
+            f"{section['name']}  {clock(section['start'])}–{clock(section['end'])}{suffix}"
+        )
         row = []
         for bar in section["bars"]:
             row.append(" ".join(bar["chords"]))

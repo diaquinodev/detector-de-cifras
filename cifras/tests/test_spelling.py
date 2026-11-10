@@ -9,7 +9,13 @@ from pathlib import Path
 CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 
-from spelling import bar_similarity, bar_signature, parse_chord_symbol, respell_chord_symbol, roman_and_function  # noqa: E402
+from spelling import (  # noqa: E402
+    bar_signature,
+    bar_similarity,
+    parse_chord_symbol,
+    respell_chord_symbol,
+    roman_and_function,
+)
 
 
 class SpellingComponentTest(unittest.TestCase):

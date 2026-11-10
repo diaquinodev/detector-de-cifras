@@ -12,8 +12,8 @@ CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 
 from chords import (  # noqa: E402
-    chord_root_name,
     choose_beat_state,
+    chord_root_name,
     fold_bar,
     kind_index,
     major_triad_root,
@@ -27,7 +27,9 @@ from constants import MAJOR_PROFILE, MINOR_PROFILE  # noqa: E402
 class ChordComponentTest(unittest.TestCase):
     def test_c_major_profile_ranks_c_major_first(self):
         chroma = MAJOR_PROFILE / np.linalg.norm(MAJOR_PROFILE)
-        best = max(profile_scores(chroma, MAJOR_PROFILE, MINOR_PROFILE), key=lambda item: item["score"])
+        best = max(
+            profile_scores(chroma, MAJOR_PROFILE, MINOR_PROFILE), key=lambda item: item["score"]
+        )
         self.assertEqual(best["tonic"], 0)
         self.assertEqual(best["mode"], "maior")
 

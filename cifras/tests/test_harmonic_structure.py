@@ -18,5 +18,7 @@ class HarmonicFacadeTest(unittest.TestCase):
     def test_the_facade_exposes_the_component_functions(self):
         self.assertIs(harmonic_structure.key_spelling, spelling.key_spelling)
         self.assertIs(harmonic_structure.spell_with, spelling.spell_with)
-        self.assertIs(harmonic_structure.map_sections_with_theory, section_map.map_sections_with_theory)
+        self.assertIs(
+            harmonic_structure.map_sections_with_theory, section_map.map_sections_with_theory
+        )
         self.assertTrue(callable(harmonic_structure.discover_repeating_cycles))

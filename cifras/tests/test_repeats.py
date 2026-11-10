@@ -14,7 +14,6 @@ sys.path.insert(0, str(CIFRAS))
 from repeats import _explains_better, chroma_by_bar, lock_repeated_phrases  # noqa: E402
 from section_map import map_sections_with_theory  # noqa: E402
 
-
 ROOTS = {
     "C": 0,
     "Cm": 0,
@@ -96,7 +95,9 @@ class RepeatLockTest(unittest.TestCase):
         bars, chroma = repeat_chart(second, source=0.9, target=0.4)
         copied = lock_repeated_phrases(bars, chroma)
         self.assertGreaterEqual(copied, 2)
-        self.assertEqual([bar["chords"] for bar in bars[8:14]], [["C"], ["G"], ["Am"], ["F"], ["C"], ["G"]])
+        self.assertEqual(
+            [bar["chords"] for bar in bars[8:14]], [["C"], ["G"], ["Am"], ["F"], ["C"], ["G"]]
+        )
         self.assertEqual(bars[9]["regra"], "repetição do trecho")
         self.assertEqual(bars[9]["origem"], "regra")
         self.assertEqual([bar["chords"] for bar in bars[14:16]], [["Em"], ["Em"]])
@@ -167,7 +168,9 @@ class RepeatLockTest(unittest.TestCase):
         chroma[:, :8] = heard
         chroma[:, 8:] = heard
         lock_repeated_phrases(bars, chroma)
-        self.assertEqual([bar["chords"] for bar in bars[:6]], [["F"], ["Bb"], ["F"], ["C"], ["F"], ["Bb"]])
+        self.assertEqual(
+            [bar["chords"] for bar in bars[:6]], [["F"], ["Bb"], ["F"], ["C"], ["F"], ["Bb"]]
+        )
         self.assertEqual(bars[0]["regra"], "repetição do trecho")
         self.assertEqual([bar["chords"] for bar in bars[6:8]], [["Cm"], ["Fm"]])
         self.assertNotIn("regra", bars[8])
@@ -180,7 +183,9 @@ class RepeatLockTest(unittest.TestCase):
         self.assertEqual([bar["chords"] for bar in bars], before)
 
     def test_a_different_progression_is_not_copied(self):
-        bars, chroma = chart(PHRASE + ["B", "B", "B", "B", "B", "B", "B", "B"], [0.9] * 8 + [0.4] * 8)
+        bars, chroma = chart(
+            PHRASE + ["B", "B", "B", "B", "B", "B", "B", "B"], [0.9] * 8 + [0.4] * 8
+        )
         before = [bar["chords"][:] for bar in bars]
         self.assertEqual(lock_repeated_phrases(bars, chroma), 0)
         self.assertEqual([bar["chords"] for bar in bars], before)

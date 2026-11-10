@@ -25,14 +25,54 @@ from pathlib import Path
 import numpy as np
 
 OUT = Path(__file__).resolve().parent / "saida"
-ROOTS = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5,
-         "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
+ROOTS = {
+    "C": 0,
+    "C#": 1,
+    "Db": 1,
+    "D": 2,
+    "D#": 3,
+    "Eb": 3,
+    "E": 4,
+    "F": 5,
+    "F#": 6,
+    "Gb": 6,
+    "G": 7,
+    "G#": 8,
+    "Ab": 8,
+    "A": 9,
+    "A#": 10,
+    "Bb": 10,
+    "B": 11,
+}
 SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-QUALITIES = {"": "maj", "m": "min", "7": "7", "maj7": "maj7", "m7": "min7", "dim": "dim",
-             "aug": "aug", "m6": "min6", "6": "maj6", "mMaj7": "minmaj7", "dim7": "dim7",
-             "m7b5": "hdim7", "sus2": "sus2", "sus4": "sus4", "°": "dim", "ø": "hdim7",
-             "9": "9", "maj9": "maj9", "m9": "min9", "11": "11", "m11": "min11", "13": "13",
-             "5": "5", "7sus4": "sus4(b7)", "add9": "maj(9)", "madd9": "min(9)"}
+QUALITIES = {
+    "": "maj",
+    "m": "min",
+    "7": "7",
+    "maj7": "maj7",
+    "m7": "min7",
+    "dim": "dim",
+    "aug": "aug",
+    "m6": "min6",
+    "6": "maj6",
+    "mMaj7": "minmaj7",
+    "dim7": "dim7",
+    "m7b5": "hdim7",
+    "sus2": "sus2",
+    "sus4": "sus4",
+    "°": "dim",
+    "ø": "hdim7",
+    "9": "9",
+    "maj9": "maj9",
+    "m9": "min9",
+    "11": "11",
+    "m11": "min11",
+    "13": "13",
+    "5": "5",
+    "7sus4": "sus4(b7)",
+    "add9": "maj(9)",
+    "madd9": "min(9)",
+}
 DEGREES = ["1", "b2", "2", "b3", "3", "4", "b5", "5", "b6", "6", "b7", "7"]
 CHORD_METRICS = ("root", "majmin", "sevenths", "tetrads", "mirex")
 TEMPO_TOLERANCE = 0.04
@@ -46,7 +86,7 @@ def to_harte(symbol: str) -> str:
         return "X"
     head, _, bass = text.partition("/")
     root_name = head[:2] if len(head) > 1 and head[1] in "#b" else head[:1]
-    quality = QUALITIES.get(head[len(root_name):])
+    quality = QUALITIES.get(head[len(root_name) :])
     if root_name not in ROOTS or quality is None:
         return "X"
     root = ROOTS[root_name]
@@ -59,9 +99,14 @@ def to_harte(symbol: str) -> str:
 def chord_intervals(bars: list[dict], model_only: bool) -> tuple[np.ndarray, list[str]]:
     intervals, labels = [], []
     for bar in bars:
-        events = bar.get("events_modelo") if model_only and "events_modelo" in bar else bar.get("events")
+        events = (
+            bar.get("events_modelo") if model_only and "events_modelo" in bar else bar.get("events")
+        )
         if not events:
-            events = [{"chord": chord, "start": bar["start"], "end": bar["end"]} for chord in bar.get("chords") or ["N"]][:1]
+            events = [
+                {"chord": chord, "start": bar["start"], "end": bar["end"]}
+                for chord in bar.get("chords") or ["N"]
+            ][:1]
         for event in events:
             if float(event["end"]) > float(event["start"]):
                 intervals.append([float(event["start"]), float(event["end"])])
@@ -84,6 +129,7 @@ def read_beats(path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 def tempo_accuracy(estimated: float, reference: float) -> tuple[bool, bool]:
     """Acc1: dentro de 4%. Acc2: idem, aceitando os fatores 2, 3, 1/2 e 1/3."""
+
     def close(value: float) -> bool:
         return abs(value - reference) <= TEMPO_TOLERANCE * reference
 
@@ -96,11 +142,18 @@ def evaluate_chords(mir_eval, reference: Path, bars: list[dict]) -> dict:
     for name, model_only in (("final", False), ("so_modelo", True)):
         est_intervals, est_labels = chord_intervals(bars, model_only)
         est_intervals, est_labels = mir_eval.util.adjust_intervals(
-            est_intervals, est_labels, ref_intervals.min(), ref_intervals.max(),
-            mir_eval.chord.NO_CHORD, mir_eval.chord.NO_CHORD,
+            est_intervals,
+            est_labels,
+            ref_intervals.min(),
+            ref_intervals.max(),
+            mir_eval.chord.NO_CHORD,
+            mir_eval.chord.NO_CHORD,
         )
         kept = est_intervals[:, 1] > est_intervals[:, 0]
-        est_intervals, est_labels = est_intervals[kept], [label for label, keep in zip(est_labels, kept) if keep]
+        est_intervals, est_labels = (
+            est_intervals[kept],
+            [label for label, keep in zip(est_labels, kept, strict=False) if keep],
+        )
         merged, ref_merged, est_merged = mir_eval.util.merge_labeled_intervals(
             ref_intervals, ref_labels, est_intervals, est_labels
         )
@@ -108,9 +161,15 @@ def evaluate_chords(mir_eval, reference: Path, bars: list[dict]) -> dict:
         scores = {}
         for metric in CHORD_METRICS:
             comparison = getattr(mir_eval.chord, metric)(ref_merged, est_merged)
-            scores[metric] = round(float(mir_eval.chord.weighted_accuracy(comparison, durations)), 4)
-        scores["sobressegmentacao"] = round(float(mir_eval.chord.overseg(ref_intervals, est_intervals)), 4)
-        scores["subsegmentacao"] = round(float(mir_eval.chord.underseg(ref_intervals, est_intervals)), 4)
+            scores[metric] = round(
+                float(mir_eval.chord.weighted_accuracy(comparison, durations)), 4
+            )
+        scores["sobressegmentacao"] = round(
+            float(mir_eval.chord.overseg(ref_intervals, est_intervals)), 4
+        )
+        scores["subsegmentacao"] = round(
+            float(mir_eval.chord.underseg(ref_intervals, est_intervals)), 4
+        )
         result[name] = scores
     return result
 
@@ -139,18 +198,25 @@ def evaluate_beats(mir_eval, reference: Path, data: dict) -> dict:
     if ref_beats.size > 2 and pulse.get("bpm"):
         reference_bpm = 60.0 / float(np.median(np.diff(ref_beats)))
         acc1, acc2 = tempo_accuracy(float(pulse["bpm"]), reference_bpm)
-        scores.update({"tempo_acc1": acc1, "tempo_acc2": acc2, "bpm_referencia": round(reference_bpm, 2)})
-    return {key: (round(float(value), 4) if isinstance(value, (float, np.floating)) else value) for key, value in scores.items()}
+        scores.update(
+            {"tempo_acc1": acc1, "tempo_acc2": acc2, "bpm_referencia": round(reference_bpm, 2)}
+        )
+    return {
+        key: (round(float(value), 4) if isinstance(value, (float, np.floating)) else value)
+        for key, value in scores.items()
+    }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Avalia as cifras salvas contra anotações de referência.")
+    parser = argparse.ArgumentParser(
+        description="Avalia as cifras salvas contra anotações de referência."
+    )
     parser.add_argument("anotacoes", type=Path)
     args = parser.parse_args()
     try:
         import mir_eval
     except ImportError:
-        raise SystemExit("Instale o mir_eval primeiro: pip install mir_eval")
+        raise SystemExit("Instale o mir_eval primeiro: pip install mir_eval") from None
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
