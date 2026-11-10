@@ -152,7 +152,7 @@ def evaluate_chords(mir_eval, reference: Path, bars: list[dict]) -> dict:
         kept = est_intervals[:, 1] > est_intervals[:, 0]
         est_intervals, est_labels = (
             est_intervals[kept],
-            [label for label, keep in zip(est_labels, kept) if keep],
+            [label for label, keep in zip(est_labels, kept, strict=False) if keep],
         )
         merged, ref_merged, est_merged = mir_eval.util.merge_labeled_intervals(
             ref_intervals, ref_labels, est_intervals, est_labels
@@ -216,7 +216,7 @@ def main() -> None:
     try:
         import mir_eval
     except ImportError:
-        raise SystemExit("Instale o mir_eval primeiro: pip install mir_eval")
+        raise SystemExit("Instale o mir_eval primeiro: pip install mir_eval") from None
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 

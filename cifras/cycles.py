@@ -29,7 +29,7 @@ def canonical_chord_choice(bars_at_slot: list[dict], sigs_at_slot: list[dict]) -
     """Escolhe o acorde representativo de uma posição dentro de um ciclo repetido."""
     root_weights: Counter[int] = Counter()
     chord_weights: Counter[tuple[str, ...]] = Counter()
-    for bar, sig in zip(bars_at_slot, sigs_at_slot):
+    for bar, sig in zip(bars_at_slot, sigs_at_slot, strict=False):
         if sig["root"] is None:
             continue
         weight = max(0.15, float(bar.get("confidence", 0.6)))

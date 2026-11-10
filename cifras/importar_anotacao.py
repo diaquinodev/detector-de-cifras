@@ -59,14 +59,17 @@ def read_instants(path: Path) -> list[tuple[int, float, str]]:
         except ValueError:
             if number == 1:
                 continue
-            raise SystemExit(f'{path.name}, linha {number}: o tempo "{cells[0]}" não é um número.')
+            raise SystemExit(
+                f'{path.name}, linha {number}: o tempo "{cells[0]}" não é um número.'
+            ) from None
         rows.append((number, moment, cells[-1] if len(cells) > 1 else ""))
     if not rows:
         raise SystemExit(f"{path.name} não tem nenhum instante.")
-    for (line_a, a, _), (line_b, b, _) in zip(rows, rows[1:]):
+    for (line_a, a, _), (line_b, b, _) in zip(rows, rows[1:], strict=False):
         if b <= a:
             raise SystemExit(
-                f"{path.name}, linhas {line_a} e {line_b}: os tempos {a:.3f} e {b:.3f} não estão em ordem crescente."
+                f"{path.name}, linhas {line_a} e {line_b}: os tempos {a:.3f} e {b:.3f} "
+                "não estão em ordem crescente."
             )
     return rows
 
@@ -99,7 +102,8 @@ def convert_beats(
     if audio is not None:
         beats, moved = snap_to_onsets(audio, beats)
         notes.append(
-            f"{moved} de {beats.size} pulsos foram encaixados no ataque mais próximo (até {ONSET_RADIUS * 1000:.0f} ms)."
+            f"{moved} de {beats.size} pulsos foram encaixados no ataque mais próximo "
+            f"(até {ONSET_RADIUS * 1000:.0f} ms)."
         )
     gaps = np.diff(beats)
     median = float(np.median(gaps))
@@ -107,7 +111,8 @@ def convert_beats(
     for index, gap in enumerate(gaps):
         if gap > GAP_TOO_LONG * median:
             notes.append(
-                f"AVISO: falta pulso entre {beats[index]:.2f} s e {beats[index + 1]:.2f} s (linha {rows[index][0]})."
+                f"AVISO: falta pulso entre {beats[index]:.2f} s e {beats[index + 1]:.2f} s "
+                f"(linha {rows[index][0]})."
             )
         elif gap < GAP_TOO_SHORT * median:
             notes.append(
@@ -126,11 +131,12 @@ def convert_beats(
         notes.append(f"Tempo forte {source}: {positions.count(1)} compassos.")
     else:
         notes.append(
-            "Sem posição no compasso: o avaliar.py não vai medir o tempo forte. Use --tempos-por-compasso."
+            "Sem posição no compasso: o avaliar.py não vai medir o tempo forte. "
+            "Use --tempos-por-compasso."
         )
     lines = [
         f"{moment:.3f}" + (f" {position}" if position else "")
-        for moment, position in zip(beats, positions)
+        for moment, position in zip(beats, positions, strict=False)
     ]
     return "\n".join(lines) + "\n", notes
 
@@ -150,18 +156,20 @@ def convert_chords(rows, duration: float) -> tuple[str, list[str]]:
         raise SystemExit(
             "Corrija o arquivo de acordes:\n  "
             + "\n  ".join(errors)
-            + "\nFormas aceitas: C, Cm, C7, Cmaj7, Cm7, Cdim, Cdim7, Cm7b5, Caug, C6, Cm6, Csus2, Csus4, C7sus4,"
+            + "\nFormas aceitas: C, Cm, C7, Cmaj7, Cm7, Cdim, Cdim7, Cm7b5, Caug, C6, Cm6, "
+            "Csus2, Csus4, C7sus4,"
             " C9, Cmaj9, Cm9, Cadd9, C5, C/E, N (sem acorde) ou Harte (C:min7)."
         )
     try:
         import mir_eval
 
-        for moment, harte in entries:
+        # moment fica com o nome: a mensagem do except abaixo diz em que instante parou.
+        for moment, harte in entries:  # noqa: B007
             mir_eval.chord.encode(harte)
     except ImportError:
         pass
     except Exception as error:
-        raise SystemExit(f"Acorde inválido em {moment:.2f} s: {error}")
+        raise SystemExit(f"Acorde inválido em {moment:.2f} s: {error}") from error
     if entries[0][0] > 0.05:
         entries.insert(0, (0.0, "N"))
     merged = [entries[0]]
@@ -171,7 +179,7 @@ def convert_chords(rows, duration: float) -> tuple[str, list[str]]:
     bounds = [moment for moment, _ in merged[1:]] + [duration]
     lines = [
         f"{start:.3f} {end:.3f} {harte}"
-        for (start, harte), end in zip(merged, bounds)
+        for (start, harte), end in zip(merged, bounds, strict=False)
         if end > start
     ]
     notes = [

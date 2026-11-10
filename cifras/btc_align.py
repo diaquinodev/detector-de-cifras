@@ -340,7 +340,7 @@ def btc_bars(
         points = bar_interior_points(start, end, beat_times)
         whole = timeline_vote(timeline, start, end)
         candidates = []
-        for left, right in zip(points, points[1:]):
+        for left, right in zip(points, points[1:], strict=False):
             candidate, previous_raw = vote_interval(
                 timeline,
                 left,

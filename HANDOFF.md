@@ -18,15 +18,16 @@ QG: brain/plans/detector-de-cifras/phase-1-estilo-ruff.md
 
 - commit 2: `ruff check --fix` (95 correções: imports não usados e ordem); os 3 nomes que outros arquivos pegavam pelo `analyze` (`MAX_AUDIO_SECONDS`, `PITCHES_SHARP`, `interval_bass`) agora vêm da origem (`constants`, `btc_align`)
 
+- commit 3: correções manuais (linhas longas, `zip(strict=False)`, `raise ... from`, `_root`); AST igual à de antes em todos os 10 arquivos, descontadas só essas mudanças; `ruff check` limpo
+
 ## Falta
-- commit 3: correções manuais (E501, B905, B904, B007)
 - commit 4: ruff no CI; PR draft e revisão do Codex
 
 ## Próximo comando
-python -m ruff check . --output-format concise  (33 avisos manuais: E501, B905, B904, B007)
+acrescentar ruff check e ruff format --check ao .github/workflows/ci.yml e ruff ao requirements-test.txt
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-10 17:15
+2026-11-10 17:45

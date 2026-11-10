@@ -156,5 +156,6 @@ if __name__ == "__main__":
             print("  PADRAO:", c)
         for s in secs:
             print(
-                f"  SECAO: {s['name']:16s} {s['start']:6.2f}s–{s['end']:6.2f}s ({s['repeats']:2d} c.) | {s['padrao']} | {s['graus']} | {s['cadencia']}"
+                f"  SECAO: {s['name']:16s} {s['start']:6.2f}s–{s['end']:6.2f}s "
+                f"({s['repeats']:2d} c.) | {s['padrao']} | {s['graus']} | {s['cadencia']}"
             )

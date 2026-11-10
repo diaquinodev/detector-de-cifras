@@ -398,7 +398,7 @@ class SavedChartsTest(unittest.TestCase):
                     self.assertEqual([event["chord"] for event in events], bar["chords"])
                     self.assertAlmostEqual(events[0]["start"], bar["start"], places=2)
                     self.assertAlmostEqual(events[-1]["end"], bar["end"], places=2)
-                    for left, right in zip(events, events[1:]):
+                    for left, right in zip(events, events[1:], strict=False):
                         self.assertAlmostEqual(left["end"], right["start"], places=2)
 
 

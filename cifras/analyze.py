@@ -7,7 +7,8 @@ no grave, o grave é a fundamental. Se não cabem, o grave entra com barra.
 Cada compasso fica com o acorde que os tempos dele sustentam. No tempo 3 a
 mesma fundamental pode ganhar a sétima, quando essa nota aparece só nessa
 metade. O sus4 só substitui a tríade quando ganha folgado. Se o grave coroa
-o dominante, o perfil de presença devolve a tônica uma quinta abaixo. O verso começa quando a voz entra. O refrão começa quando essa
+o dominante, o perfil de presença devolve a tônica uma quinta abaixo.
+O verso começa quando a voz entra. O refrão começa quando essa
 voz empurra e o empurro se sustenta num acorde novo. Um trecho cujo
 áudio repete outro herda, no miolo, a cifra da volta que esse áudio confirma.
 """

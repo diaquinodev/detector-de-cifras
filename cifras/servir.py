@@ -414,7 +414,8 @@ class Handler(BaseHTTPRequestHandler):
         if not YOUTUBE_ENABLED:
             self._send_json(
                 {
-                    "erro": "Download do YouTube desligado. Ele vai contra os termos da plataforma; suba um arquivo seu."
+                    "erro": "Download do YouTube desligado. Ele vai contra os termos da "
+                    "plataforma; suba um arquivo seu."
                 },
                 403,
             )

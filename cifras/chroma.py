@@ -113,7 +113,7 @@ def chroma_at_beats(
 
 def tuning_from_bass(frequencies: np.ndarray, confidences: np.ndarray) -> tuple[float, float]:
     deviations = []
-    for freq, confidence in zip(frequencies, confidences):
+    for freq, confidence in zip(frequencies, confidences, strict=False):
         if confidence < TUNING_CONFIDENCE or freq <= 0:
             continue
         semitone = 12 * np.log2(freq / A4_HZ)
