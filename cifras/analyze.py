@@ -27,6 +27,7 @@ import numpy as np
 from audio import find_default_audio, load_spectrum
 from btc_align import (
     btc_bars,
+    interval_bass,  # noqa: F401 (reexportado: código de fora usava analyze.interval_bass)
     key_from_btc,
 )
 from chords import (
@@ -41,7 +42,9 @@ from chroma import (
     tuning_from_bass,
 )
 from constants import (
+    MAX_AUDIO_SECONDS,  # noqa: F401 (reexportado: servir.py usava analyze.MAX_AUDIO_SECONDS)
     PITCHES_FLAT,
+    PITCHES_SHARP,  # noqa: F401 (reexportado: os testes usavam analyze.PITCHES_SHARP)
     ROOT,
 )
 from form import (

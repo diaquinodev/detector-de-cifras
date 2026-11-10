@@ -22,14 +22,16 @@ QG: brain/plans/detector-de-cifras/phase-1-estilo-ruff.md
 
 - commit 4: `ruff check` e `ruff format --check` no CI, `ruff==0.17.3` fixado no requirements-test.txt; verificação nova no AGENTS.md e no README
 
+- PR #2 aberto; 1ª revisão do Codex (Revise) tratada: `analyze` volta a expor `MAX_AUDIO_SECONDS`, `PITCHES_SHARP` e `interval_bass`, com teste que trava a interface
+
 ## Falta
-- PR draft da fase 1 e revisão do Codex
+- nova revisão do Codex no commit atual do PR #2
 
 ## Próximo comando
-abrir o PR draft da fase 1 e pedir revisão cruzada ao Codex
+revisão cruzada do PR #2 pelo Codex; com Accept, marcar Ready for review
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-10 18:00
+2026-11-10 18:20

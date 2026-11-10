@@ -11,7 +11,16 @@ import numpy as np
 CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 
+import analyze  # noqa: E402
 from analyze import chart_document  # noqa: E402
+
+
+class AnalyzeInterfaceTest(unittest.TestCase):
+    def test_keeps_the_names_other_code_imported_from_analyze(self):
+        # servir.py e os testes pegavam estes nomes por dentro do analyze antes da fase 1.
+        for name in ("MAX_AUDIO_SECONDS", "PITCHES_SHARP", "interval_bass", "ROOT", "analyze"):
+            with self.subTest(name=name):
+                self.assertTrue(hasattr(analyze, name))
 
 
 class AnalyzeDocumentTest(unittest.TestCase):
