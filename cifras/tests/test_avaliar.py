@@ -30,7 +30,17 @@ class AvaliarTest(unittest.TestCase):
         self.assertTrue(flexible)
 
     def test_events_become_labeled_intervals(self):
-        bars = [{"start": 0.0, "end": 2.0, "chords": ["C"], "events": [{"chord": "C", "start": 0.0, "end": 1.0}, {"chord": "G", "start": 1.0, "end": 2.0}]}]
+        bars = [
+            {
+                "start": 0.0,
+                "end": 2.0,
+                "chords": ["C"],
+                "events": [
+                    {"chord": "C", "start": 0.0, "end": 1.0},
+                    {"chord": "G", "start": 1.0, "end": 2.0},
+                ],
+            }
+        ]
         intervals, labels = chord_intervals(bars, model_only=False)
         self.assertEqual(labels, ["C:maj", "G:maj"])
         self.assertEqual(intervals.shape, (2, 2))

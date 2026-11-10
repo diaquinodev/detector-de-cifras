@@ -23,7 +23,9 @@ from harmonic_structure import (  # noqa: E402
 import servir  # noqa: E402
 
 
-def probabilities_for(size: int, strong: list[int], high: float = 0.9, low: float = 0.05) -> np.ndarray:
+def probabilities_for(
+    size: int, strong: list[int], high: float = 0.9, low: float = 0.05
+) -> np.ndarray:
     values = np.full(size, low)
     values[strong] = high
     return values
@@ -48,7 +50,9 @@ class BarPositionTest(unittest.TestCase):
         self.assertEqual(result.tolist(), strong)
 
     def test_no_one_beat_bar(self):
-        result = decode_bar_positions(probabilities_for(16, [0, 4, 5, 6, 7, 8, 12], high=0.98, low=0.02), 4)
+        result = decode_bar_positions(
+            probabilities_for(16, [0, 4, 5, 6, 7, 8, 12], high=0.98, low=0.02), 4
+        )
         self.assertTrue(np.all(np.diff(result) >= 2))
 
     def test_neutral_edges_follow_the_grid(self):
@@ -97,7 +101,9 @@ class ServerGuardTest(unittest.TestCase):
         self.assertFalse(servir.origin_allowed(None))
 
     def test_content_type(self):
-        self.assertTrue(servir.content_type_is("application/json; charset=utf-8", "application/json"))
+        self.assertTrue(
+            servir.content_type_is("application/json; charset=utf-8", "application/json")
+        )
         self.assertFalse(servir.content_type_is("text/plain", "application/json"))
 
     def test_youtube_is_off_by_default(self):
@@ -155,10 +161,20 @@ class PageContractTest(unittest.TestCase):
 
 class ChordEditTest(unittest.TestCase):
     def test_replaces_one_chord_and_keeps_the_rest(self):
-        data = {"compassos": [{"bar": 2, "start": 1, "end": 2, "chords": ["C", "G"], "events": [
-            {"chord": "C", "start": 1, "end": 1.5},
-            {"chord": "G", "start": 1.5, "end": 2},
-        ]}]}
+        data = {
+            "compassos": [
+                {
+                    "bar": 2,
+                    "start": 1,
+                    "end": 2,
+                    "chords": ["C", "G"],
+                    "events": [
+                        {"chord": "C", "start": 1, "end": 1.5},
+                        {"chord": "G", "start": 1.5, "end": 2},
+                    ],
+                }
+            ]
+        }
         servir.apply_chord_edit(data, 2, 1, "D7")
         self.assertEqual(data["compassos"][0]["chords"], ["C", "D7"])
         self.assertEqual(data["compassos"][0]["events"][0]["chord"], "C")
@@ -166,7 +182,12 @@ class ChordEditTest(unittest.TestCase):
 
     def test_rejects_a_chord_that_is_not_a_symbol(self):
         with self.assertRaises(ValueError):
-            servir.apply_chord_edit({"compassos": [{"bar": 1, "chords": ["C"], "events": [{"chord": "C"}]}]}, 1, 0, "alert(1)")
+            servir.apply_chord_edit(
+                {"compassos": [{"bar": 1, "chords": ["C"], "events": [{"chord": "C"}]}]},
+                1,
+                0,
+                "alert(1)",
+            )
 
 
 class SpellingTest(unittest.TestCase):
@@ -198,13 +219,19 @@ class KeyFitTest(unittest.TestCase):
 class ModulationTest(unittest.TestCase):
     def test_minor_key_iv_is_not_a_modulation(self):
         loop = ["Bm", "Em7", "F#7", "Bm", "G", "Em7", "A", "F#7"]
-        bars = [{"chords": [chord], "start": float(i), "end": float(i + 1)} for i, chord in enumerate(loop * 5)]
+        bars = [
+            {"chords": [chord], "start": float(i), "end": float(i + 1)}
+            for i, chord in enumerate(loop * 5)
+        ]
         self.assertIsNone(detect_key_modulation(bars, 11, "menor"))
 
     def test_half_step_up_in_major_is_found(self):
         home = ["Fmaj7", "G", "Em7", "Am7"] * 7
         up = ["F#maj7", "G#", "Fm7", "A#m7"] * 4
-        bars = [{"chords": [chord], "start": float(i), "end": float(i + 1)} for i, chord in enumerate(home + up)]
+        bars = [
+            {"chords": [chord], "start": float(i), "end": float(i + 1)}
+            for i, chord in enumerate(home + up)
+        ]
         found = detect_key_modulation(bars, 0, "maior")
         self.assertEqual((found["new_tonic"], found["semitones"]), (1, 1))
 

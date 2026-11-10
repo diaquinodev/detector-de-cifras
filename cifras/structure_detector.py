@@ -126,7 +126,9 @@ def _decoded_input(path: Path):
         yield target
 
 
-def cached_ai_labels(path: Path, bars: list[dict], run_if_missing: bool = False) -> tuple[list[str] | None, int | None]:
+def cached_ai_labels(
+    path: Path, bars: list[dict], run_if_missing: bool = False
+) -> tuple[list[str] | None, int | None]:
     """Retorna os rótulos por compasso e início vocal do All-In-One se já estiverem em cache.
 
     Evita bloquear 25 minutos na CPU quando o mapeamento por ciclos harmônicos e
@@ -137,7 +139,9 @@ def cached_ai_labels(path: Path, bars: list[dict], run_if_missing: bool = False)
     fingerprint = hashlib.sha1(
         f"{path.resolve()}:{path.stat().st_size}:{path.stat().st_mtime_ns}".encode("utf-8")
     ).hexdigest()[:10]
-    stem_name = f"{path.stem}-{fingerprint}" if path.suffix.lower() not in {".wav", ".flac"} else path.stem
+    stem_name = (
+        f"{path.stem}-{fingerprint}" if path.suffix.lower() not in {".wav", ".flac"} else path.stem
+    )
     result_json = CACHE / "results" / f"{stem_name}.json"
     vocal_path = CACHE / "demix" / "htdemucs" / stem_name / "vocals.wav"
 

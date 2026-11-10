@@ -26,7 +26,14 @@ WEB = ROOT / "cifras" / "web"
 PAGE = WEB / "index.html"
 STYLES = WEB / "styles.css"
 UPLOADS = ROOT / "uploads"
-SKIPPED = {"moises-app-x64", "moises-setup-unpacked", "rea", "node_modules", "cifras", "__pycache__"}
+SKIPPED = {
+    "moises-app-x64",
+    "moises-setup-unpacked",
+    "rea",
+    "node_modules",
+    "cifras",
+    "__pycache__",
+}
 AUDIO = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".flac": "audio/flac"}
 MAX_AUDIO_BYTES = 200 * 1024 * 1024
 MAX_VIDEO_SECONDS = 15 * 60
@@ -55,7 +62,9 @@ def content_type_is(header: str | None, expected: str) -> bool:
 def audio_files() -> list[Path]:
     found = []
     for dirpath, dirnames, filenames in os.walk(ROOT):
-        dirnames[:] = [name for name in dirnames if name not in SKIPPED and not name.startswith(".")]
+        dirnames[:] = [
+            name for name in dirnames if name not in SKIPPED and not name.startswith(".")
+        ]
         for name in filenames:
             path = Path(dirpath) / name
             if path.suffix.lower() in AUDIO:
@@ -68,7 +77,11 @@ def resolve_track(raw: str) -> Path:
     if not text or text.startswith("/") or ":" in text:
         raise ValueError("Faixa inválida.")
     candidate = (ROOT / text).resolve()
-    if ROOT not in candidate.parents or not candidate.is_file() or candidate.suffix.lower() not in AUDIO:
+    if (
+        ROOT not in candidate.parents
+        or not candidate.is_file()
+        or candidate.suffix.lower() not in AUDIO
+    ):
         raise ValueError("Essa faixa não está no projeto.")
     if any(part in SKIPPED for part in candidate.parts):
         raise ValueError("Essa pasta fica de fora.")
@@ -84,7 +97,9 @@ def safe_upload_name(raw: str) -> str:
     suffix = Path(original).suffix.lower()
     if suffix not in AUDIO:
         raise ValueError("Envie um arquivo MP3, WAV ou FLAC.")
-    stem = unicodedata.normalize("NFKD", Path(original).stem).encode("ascii", "ignore").decode("ascii")
+    stem = (
+        unicodedata.normalize("NFKD", Path(original).stem).encode("ascii", "ignore").decode("ascii")
+    )
     stem = re.sub(r"[^A-Za-z0-9._ -]+", "-", stem).strip(" .-_") or "audio"
     candidate = UPLOADS / f"{stem}{suffix}"
     counter = 2
@@ -179,7 +194,9 @@ CHORD_TEXT = re.compile(
 )
 
 
-def apply_chord_edit(data: dict, bar_number: int, event_index: int, chord: str, source: str = "cifra") -> None:
+def apply_chord_edit(
+    data: dict, bar_number: int, event_index: int, chord: str, source: str = "cifra"
+) -> None:
     if not CHORD_TEXT.match(chord or ""):
         raise ValueError("Acorde inválido.")
     if event_index < 0:
@@ -206,7 +223,9 @@ def apply_chord_edit(data: dict, bar_number: int, event_index: int, chord: str, 
     raise ValueError("Compasso não encontrado.")
 
 
-def save_chord_edit(track: Path, bar_number: int, event_index: int, chord: str, source: str = "cifra") -> None:
+def save_chord_edit(
+    track: Path, bar_number: int, event_index: int, chord: str, source: str = "cifra"
+) -> None:
     path = OUT / f"{track.stem}.json"
     if not path.is_file():
         raise ValueError("Esta faixa ainda não foi medida.")
@@ -218,7 +237,9 @@ def save_chord_edit(track: Path, bar_number: int, event_index: int, chord: str, 
 def save_result(path: Path, result: dict) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     payload = {key: value for key, value in result.items() if key != "cifra"}
-    (OUT / f"{path.stem}.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (OUT / f"{path.stem}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     (OUT / f"{path.stem}.txt").write_text(result["cifra"], encoding="utf-8")
 
 
@@ -240,11 +261,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send_bytes(STYLES.read_bytes(), "text/css; charset=utf-8")
             return
         if parsed.path == "/api/config":
-            self._send_json({"youtube": YOUTUBE_ENABLED, "max_audio_min": analyze.MAX_AUDIO_SECONDS // 60})
+            self._send_json(
+                {"youtube": YOUTUBE_ENABLED, "max_audio_min": analyze.MAX_AUDIO_SECONDS // 60}
+            )
             return
         if parsed.path == "/api/musicas":
             songs = [
-                {"nome": path.stem, "faixa": relative(path), "medida": (OUT / f"{path.stem}.json").is_file()}
+                {
+                    "nome": path.stem,
+                    "faixa": relative(path),
+                    "medida": (OUT / f"{path.stem}.json").is_file(),
+                }
                 for path in audio_files()
             ]
             self._send_json({"musicas": songs})
@@ -257,7 +284,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             chart = chart_for(track)
             if chart is None:
-                self._send_json({"erro": "Esta faixa ainda não foi medida.", "faixa": relative(track)}, 404)
+                self._send_json(
+                    {"erro": "Esta faixa ainda não foi medida.", "faixa": relative(track)}, 404
+                )
                 return
             self._send_json(chart)
             return
@@ -278,7 +307,9 @@ class Handler(BaseHTTPRequestHandler):
         # Uma recusa pode sair antes de ler o corpo; o que sobrar no socket não
         # pode virar o próximo pedido da mesma conexão.
         self.close_connection = True
-        if not host_allowed(self.headers.get("Host")) or not origin_allowed(self.headers.get("Origin")):
+        if not host_allowed(self.headers.get("Host")) or not origin_allowed(
+            self.headers.get("Origin")
+        ):
             self._send_json({"erro": "Pedido de outra origem recusado."}, 403)
             return
         parsed = urlparse(self.path)
@@ -321,7 +352,9 @@ class Handler(BaseHTTPRequestHandler):
             bar_number = int(body.get("compasso"))
             event_index = int(body.get("indice"))
             source = "modelo" if body.get("fonte") == "modelo" else "cifra"
-            save_chord_edit(track, bar_number, event_index, str(body.get("acorde") or "").strip(), source)
+            save_chord_edit(
+                track, bar_number, event_index, str(body.get("acorde") or "").strip(), source
+            )
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             self._send_json({"erro": str(error)}, 400)
             return
@@ -381,7 +414,9 @@ class Handler(BaseHTTPRequestHandler):
     def _youtube(self) -> None:
         if not YOUTUBE_ENABLED:
             self._send_json(
-                {"erro": "Download do YouTube desligado. Ele vai contra os termos da plataforma; suba um arquivo seu."},
+                {
+                    "erro": "Download do YouTube desligado. Ele vai contra os termos da plataforma; suba um arquivo seu."
+                },
                 403,
             )
             return
@@ -420,7 +455,9 @@ class Handler(BaseHTTPRequestHandler):
             url,
         ]
         try:
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=20 * 60, check=False)
+            completed = subprocess.run(
+                command, capture_output=True, text=True, timeout=20 * 60, check=False
+            )
         except subprocess.TimeoutExpired:
             self._send_json({"erro": "O download do YouTube excedeu 20 minutos."}, 504)
             return
@@ -432,10 +469,16 @@ class Handler(BaseHTTPRequestHandler):
         lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
         try:
             target = Path(lines[-1]).resolve()
-            if UPLOADS.resolve() not in target.parents or not target.is_file() or target.suffix.lower() not in AUDIO:
+            if (
+                UPLOADS.resolve() not in target.parents
+                or not target.is_file()
+                or target.suffix.lower() not in AUDIO
+            ):
                 raise ValueError
         except (IndexError, ValueError):
-            self._send_json({"erro": "O YouTube baixou o áudio, mas não informou o arquivo final."}, 500)
+            self._send_json(
+                {"erro": "O YouTube baixou o áudio, mas não informou o arquivo final."}, 500
+            )
             return
         self._send_json({"faixa": relative(target), "nome": target.stem}, 201)
 

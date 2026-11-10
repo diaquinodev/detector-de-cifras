@@ -39,7 +39,9 @@ from constants import (
 
 
 def bass_bandpass(samples: np.ndarray) -> np.ndarray:
-    sos = signal.butter(4, [BASS_BAND_LOW, BASS_BAND_HIGH], btype="band", fs=SAMPLE_RATE, output="sos")
+    sos = signal.butter(
+        4, [BASS_BAND_LOW, BASS_BAND_HIGH], btype="band", fs=SAMPLE_RATE, output="sos"
+    )
     return signal.sosfiltfilt(sos, samples)
 
 
@@ -57,7 +59,9 @@ def harmonic_dictionary() -> tuple[np.ndarray, np.ndarray]:
     return dictionary, notes
 
 
-def semitone_spectrogram(freqs: np.ndarray, magnitude_spectrum: np.ndarray, reference: float) -> np.ndarray:
+def semitone_spectrogram(
+    freqs: np.ndarray, magnitude_spectrum: np.ndarray, reference: float
+) -> np.ndarray:
     rows = SPEC_HIGH - SPEC_LOW + 1
     spec = np.zeros((rows, magnitude_spectrum.shape[1]))
     valid = np.flatnonzero(freqs >= SEMITONE_FREQ_FLOOR)
@@ -131,7 +135,9 @@ def estimate_bass(samples: np.ndarray, beat_times: np.ndarray, names: list[str])
     confidences = []
     pitches = []
     for index, start in enumerate(beat_times):
-        end = float(beat_times[index + 1]) if index + 1 < beat_times.size else float(start) + interval
+        end = (
+            float(beat_times[index + 1]) if index + 1 < beat_times.size else float(start) + interval
+        )
         span = max(BASS_SPAN_MIN_S, end - float(start))
         left = int((float(start) + BASS_WINDOW_START * span) * SAMPLE_RATE)
         right = int((float(start) + BASS_WINDOW_END * span) * SAMPLE_RATE)
@@ -142,7 +148,12 @@ def estimate_bass(samples: np.ndarray, beat_times: np.ndarray, names: list[str])
         pitches.append(freq)
         labels.append(note_name(freq, names) if freq > 0 else "?")
     return [
-        {"beat": index, "label": label, "confidence": round(confidences[index], 3), "hz": round(pitches[index], 1)}
+        {
+            "beat": index,
+            "label": label,
+            "confidence": round(confidences[index], 3),
+            "hz": round(pitches[index], 1),
+        }
         for index, label in enumerate(labels)
     ]
 
@@ -176,7 +187,10 @@ def fundamental(chunk: np.ndarray) -> tuple[float, float]:
     else:
         strongest = max(peaks, key=lambda lag: acf[lag])
         octaves = [
-            lag for lag in peaks if lag < strongest * OCTAVE_LAG_RATIO and acf[lag] >= acf[strongest] * OCTAVE_STRENGTH_RATIO
+            lag
+            for lag in peaks
+            if lag < strongest * OCTAVE_LAG_RATIO
+            and acf[lag] >= acf[strongest] * OCTAVE_STRENGTH_RATIO
         ]
         lag = min(octaves) if octaves else strongest
     if 1 <= lag < acf.size - 1:

@@ -308,7 +308,9 @@ def _lock_groups(
         if _hits_claimed(claimed, template, length):
             continue
         accepted = [template]
-        for other in sorted(members, key=lambda member: _mean_confidence(bars, member, core), reverse=True):
+        for other in sorted(
+            members, key=lambda member: _mean_confidence(bars, member, core), reverse=True
+        ):
             if other == template or any(_overlaps(other, taken, length) for taken in accepted):
                 continue
             if _hits_claimed(claimed, other, length):

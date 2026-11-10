@@ -23,7 +23,8 @@ def find_default_audio() -> Path:
     found = [
         path
         for path in ROOT.rglob("*")
-        if path.suffix.lower() in AUDIO_SUFFIXES and not any(part in SKIPPED_AUDIO_DIRS for part in path.parts)
+        if path.suffix.lower() in AUDIO_SUFFIXES
+        and not any(part in SKIPPED_AUDIO_DIRS for part in path.parts)
     ]
     if len(found) == 1:
         return found[0]

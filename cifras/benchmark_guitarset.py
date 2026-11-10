@@ -39,12 +39,16 @@ def references(jams_path: Path, folder: Path) -> tuple[Path, Path, float]:
     stem = jams_path.stem
     lab = folder / f"{stem}.lab"
     lab.write_text(
-        "".join(f"{o['time']:.4f} {o['time'] + o['duration']:.4f} {o['value']}\n" for o in chords["data"]),
+        "".join(
+            f"{o['time']:.4f} {o['time'] + o['duration']:.4f} {o['value']}\n"
+            for o in chords["data"]
+        ),
         encoding="utf-8",
     )
     beat_file = folder / f"{stem}.beats"
     beat_file.write_text(
-        "".join(f"{o['time']:.4f} {o['value']['position']}\n" for o in beats["data"]), encoding="utf-8"
+        "".join(f"{o['time']:.4f} {o['value']['position']}\n" for o in beats["data"]),
+        encoding="utf-8",
     )
     return lab, beat_file, float(jam["file_metadata"]["duration"])
 
@@ -63,7 +67,10 @@ def run(root: Path) -> None:
     print(f"{len(done)} feitos, {len(pending)} pendentes", flush=True)
     for number, jams_path in enumerate(pending, start=1):
         audio = root / f"{jams_path.stem}_mic.wav"
-        entry = {"trecho": jams_path.stem, "estilo": jams_path.stem.split("_")[1].split("-")[0].rstrip("0123456789")}
+        entry = {
+            "trecho": jams_path.stem,
+            "estilo": jams_path.stem.split("_")[1].split("-")[0].rstrip("0123456789"),
+        }
         started = time.perf_counter()
         try:
             lab, beat_file, duration = references(jams_path, refs)
@@ -81,7 +88,10 @@ def run(root: Path) -> None:
         with results.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
         status = entry.get("erro") or f"majmin {entry['acordes']['final']['majmin']:.3f}"
-        print(f"[{number}/{len(pending)}] {jams_path.stem}: {status} ({entry['segundos']} s)", flush=True)
+        print(
+            f"[{number}/{len(pending)}] {jams_path.stem}: {status} ({entry['segundos']} s)",
+            flush=True,
+        )
 
 
 def latest_entries(root: Path) -> list[dict]:
@@ -102,15 +112,25 @@ def summary(root: Path) -> dict:
 
     def chords(group: list[dict], variant: str) -> dict:
         total = sum(entry["duracao_s"] for entry in group)
-        return {key: round(sum(entry["acordes"][variant][key] * entry["duracao_s"] for entry in group) / total, 4) for key in CHORD_KEYS}
+        return {
+            key: round(
+                sum(entry["acordes"][variant][key] * entry["duracao_s"] for entry in group) / total,
+                4,
+            )
+            for key in CHORD_KEYS
+        }
 
     def beats(group: list[dict]) -> dict:
         out = {}
         for key in BEAT_KEYS:
             values = [entry["ritmo"][key] for entry in group if key in entry["ritmo"]]
             out[key] = round(sum(values) / len(values), 4) if values else None
-        out["tempo_acc1"] = round(sum(bool(entry["ritmo"].get("tempo_acc1")) for entry in group) / len(group), 4)
-        out["tempo_acc2"] = round(sum(bool(entry["ritmo"].get("tempo_acc2")) for entry in group) / len(group), 4)
+        out["tempo_acc1"] = round(
+            sum(bool(entry["ritmo"].get("tempo_acc1")) for entry in group) / len(group), 4
+        )
+        out["tempo_acc2"] = round(
+            sum(bool(entry["ritmo"].get("tempo_acc2")) for entry in group) / len(group), 4
+        )
         out["compasso_4"] = round(sum(entry["compasso"] == 4 for entry in group) / len(group), 4)
         return out
 
@@ -130,10 +150,16 @@ def summary(root: Path) -> dict:
         "acordes_so_modelo": chords(good, "so_modelo") if good else None,
         "ritmo": beats(good) if good else None,
         "por_estilo": {
-            style: {"n": len(group), "majmin_final": chords(group, "final")["majmin"], "majmin_so_modelo": chords(group, "so_modelo")["majmin"]}
+            style: {
+                "n": len(group),
+                "majmin_final": chords(group, "final")["majmin"],
+                "majmin_so_modelo": chords(group, "so_modelo")["majmin"],
+            }
             for style, group in sorted(styles.items())
         },
-        "piores_majmin": sorted(((entry["acordes"]["final"]["majmin"], entry["trecho"]) for entry in good))[:8],
+        "piores_majmin": sorted(
+            ((entry["acordes"]["final"]["majmin"], entry["trecho"]) for entry in good)
+        )[:8],
     }
 
 
@@ -149,7 +175,9 @@ def main() -> None:
     if not args.resumo:
         run(root)
     report = summary(root)
-    (root / "resumo.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    (root / "resumo.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

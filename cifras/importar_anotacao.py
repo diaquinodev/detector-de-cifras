@@ -60,13 +60,15 @@ def read_instants(path: Path) -> list[tuple[int, float, str]]:
         except ValueError:
             if number == 1:
                 continue
-            raise SystemExit(f"{path.name}, linha {number}: o tempo \"{cells[0]}\" não é um número.")
+            raise SystemExit(f'{path.name}, linha {number}: o tempo "{cells[0]}" não é um número.')
         rows.append((number, moment, cells[-1] if len(cells) > 1 else ""))
     if not rows:
         raise SystemExit(f"{path.name} não tem nenhum instante.")
     for (line_a, a, _), (line_b, b, _) in zip(rows, rows[1:]):
         if b <= a:
-            raise SystemExit(f"{path.name}, linhas {line_a} e {line_b}: os tempos {a:.3f} e {b:.3f} não estão em ordem crescente.")
+            raise SystemExit(
+                f"{path.name}, linhas {line_a} e {line_b}: os tempos {a:.3f} e {b:.3f} não estão em ordem crescente."
+            )
     return rows
 
 
@@ -87,7 +89,9 @@ def position_of(label: str) -> int | None:
     return int(head) if head.isdigit() else None
 
 
-def convert_beats(rows, duration: float, beats_per_bar: int | None, audio: Path | None) -> tuple[str, list[str]]:
+def convert_beats(
+    rows, duration: float, beats_per_bar: int | None, audio: Path | None
+) -> tuple[str, list[str]]:
     notes = []
     beats = np.asarray([moment for _, moment, _ in rows])
     late = [line for line, moment, _ in rows if moment > duration + 0.5]
@@ -95,15 +99,21 @@ def convert_beats(rows, duration: float, beats_per_bar: int | None, audio: Path 
         raise SystemExit(f"Pulsos depois do fim da faixa ({duration:.1f} s), linhas {late[:5]}.")
     if audio is not None:
         beats, moved = snap_to_onsets(audio, beats)
-        notes.append(f"{moved} de {beats.size} pulsos foram encaixados no ataque mais próximo (até {ONSET_RADIUS * 1000:.0f} ms).")
+        notes.append(
+            f"{moved} de {beats.size} pulsos foram encaixados no ataque mais próximo (até {ONSET_RADIUS * 1000:.0f} ms)."
+        )
     gaps = np.diff(beats)
     median = float(np.median(gaps))
     notes.append(f"{beats.size} pulsos, {60 / median:.1f} BPM pela mediana dos intervalos.")
     for index, gap in enumerate(gaps):
         if gap > GAP_TOO_LONG * median:
-            notes.append(f"AVISO: falta pulso entre {beats[index]:.2f} s e {beats[index + 1]:.2f} s (linha {rows[index][0]}).")
+            notes.append(
+                f"AVISO: falta pulso entre {beats[index]:.2f} s e {beats[index + 1]:.2f} s (linha {rows[index][0]})."
+            )
         elif gap < GAP_TOO_SHORT * median:
-            notes.append(f"AVISO: pulso duplo em {beats[index + 1]:.2f} s (linha {rows[index + 1][0]}).")
+            notes.append(
+                f"AVISO: pulso duplo em {beats[index + 1]:.2f} s (linha {rows[index + 1][0]})."
+            )
     positions = [position_of(label) for _, _, label in rows]
     if all(position is not None for position in positions):
         source = "pelos rótulos"
@@ -116,8 +126,13 @@ def convert_beats(rows, duration: float, beats_per_bar: int | None, audio: Path 
     if source:
         notes.append(f"Tempo forte {source}: {positions.count(1)} compassos.")
     else:
-        notes.append("Sem posição no compasso: o avaliar.py não vai medir o tempo forte. Use --tempos-por-compasso.")
-    lines = [f"{moment:.3f}" + (f" {position}" if position else "") for moment, position in zip(beats, positions)]
+        notes.append(
+            "Sem posição no compasso: o avaliar.py não vai medir o tempo forte. Use --tempos-por-compasso."
+        )
+    lines = [
+        f"{moment:.3f}" + (f" {position}" if position else "")
+        for moment, position in zip(beats, positions)
+    ]
     return "\n".join(lines) + "\n", notes
 
 
@@ -134,7 +149,8 @@ def convert_chords(rows, duration: float) -> tuple[str, list[str]]:
         entries.append((moment, harte))
     if errors:
         raise SystemExit(
-            "Corrija o arquivo de acordes:\n  " + "\n  ".join(errors)
+            "Corrija o arquivo de acordes:\n  "
+            + "\n  ".join(errors)
             + "\nFormas aceitas: C, Cm, C7, Cmaj7, Cm7, Cdim, Cdim7, Cm7b5, Caug, C6, Cm6, Csus2, Csus4, C7sus4,"
             " C9, Cmaj9, Cm9, Cadd9, C5, C/E, N (sem acorde) ou Harte (C:min7)."
         )
@@ -154,18 +170,32 @@ def convert_chords(rows, duration: float) -> tuple[str, list[str]]:
         if harte != merged[-1][1]:
             merged.append((moment, harte))
     bounds = [moment for moment, _ in merged[1:]] + [duration]
-    lines = [f"{start:.3f} {end:.3f} {harte}" for (start, harte), end in zip(merged, bounds) if end > start]
-    notes = [f"{len(lines)} trechos de acorde, {len(set(h for _, h in merged))} acordes diferentes."]
+    lines = [
+        f"{start:.3f} {end:.3f} {harte}"
+        for (start, harte), end in zip(merged, bounds)
+        if end > start
+    ]
+    notes = [
+        f"{len(lines)} trechos de acorde, {len(set(h for _, h in merged))} acordes diferentes."
+    ]
     return "\n".join(lines) + "\n", notes
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Gera o gabarito do avaliar.py a partir do Sonic Visualiser.")
+    parser = argparse.ArgumentParser(
+        description="Gera o gabarito do avaliar.py a partir do Sonic Visualiser."
+    )
     parser.add_argument("faixa", help="nome (ou parte do nome) da faixa já analisada em saida/")
     parser.add_argument("--pulsos", type=Path)
     parser.add_argument("--acordes", type=Path)
-    parser.add_argument("--tempos-por-compasso", type=int, help="quando os pulsos não têm rótulo; o primeiro pulso é o tempo 1")
-    parser.add_argument("--audio", type=Path, help="encaixa cada pulso no ataque mais próximo, até 50 ms")
+    parser.add_argument(
+        "--tempos-por-compasso",
+        type=int,
+        help="quando os pulsos não têm rótulo; o primeiro pulso é o tempo 1",
+    )
+    parser.add_argument(
+        "--audio", type=Path, help="encaixa cada pulso no ataque mais próximo, até 50 ms"
+    )
     args = parser.parse_args()
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -177,7 +207,9 @@ def main() -> None:
     NOTES.mkdir(exist_ok=True)
     print(f"Faixa: {track.stem} ({duration:.1f} s)")
     if args.pulsos:
-        text, notes = convert_beats(read_instants(args.pulsos), duration, args.tempos_por_compasso, args.audio)
+        text, notes = convert_beats(
+            read_instants(args.pulsos), duration, args.tempos_por_compasso, args.audio
+        )
         (NOTES / f"{track.stem}.beats").write_text(text, encoding="utf-8")
         print("\n".join(notes))
     if args.acordes:

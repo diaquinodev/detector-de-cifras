@@ -4,30 +4,28 @@
 Claude Code
 
 ## Branch
-fase/0-importar-codigo
+fase/1-estilo-ruff
 
 ## Trilha
 grande
 
 ## Plano/fase
-QG: brain/plans/detector-de-cifras/phase-0-repositorio-e-importacao.md
+QG: brain/plans/detector-de-cifras/phase-1-estilo-ruff.md
 
 ## Feito
-- main com a estrutura do kit (camada comum) e .gitignore que barra áudio, pesos e saídas
-- código de `cifras/` e pesquisa (`docs/pesquisa/`) copiados do laboratório `D:\PROJETOS\moises-rea`, sem mudar código
-- pyproject (pytest), requirements-test.txt, CI com pytest, README e AGENTS.md do projeto
-- `python -m pytest`: 95 testes e 676 subtestes verdes, igual ao laboratório
-- revisões do Codex (Revise, 3x) tratadas: LICENSE (MIT), LICENSE-APACHE-2.0 (trecho do tensor2tensor) e PROCEDENCIA.md no vendor do BTC; fixture fictícia em `cifras/tests/fixtures/` para o `SavedChartsTest` conferir algo no CI; .gitignore barra GuitarSet e *.jams em qualquer pasta
+- fase 0 integrada (PR #1)
+- commit 1: ruff configurado no pyproject (regras do kit, `cifras/vendor` fora) e `ruff format` em 28 arquivos; pytest verde (95 testes, 678 subtestes)
 
 ## Falta
-- nova revisão do Codex no commit atual do PR #1
-- fase 1 (ruff) e fase 2 (pesos reproduzíveis)
+- commit 2: `ruff check --fix` (imports não usados e ordenados), conferindo reexportações
+- commit 3: correções manuais (E501, B905, B904, B007)
+- commit 4: ruff no CI; PR draft e revisão do Codex
 
 ## Próximo comando
-usuário: merge do PR da fase 0; depois "continuar" para a fase 1 (estilo com ruff)
+python -m ruff check . --select F401 --output-format concise  (conferir cada import antes do --fix)
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-10 16:30
+2026-11-10 17:00

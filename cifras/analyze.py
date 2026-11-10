@@ -126,6 +126,7 @@ from pulse import (
     track_pulse,
 )
 
+
 def detect_harmony(samples, freqs, spectrum, pulse):
     bass = estimate_bass(samples, pulse["beat_times"], PITCHES_FLAT)
     bass_hz = np.array([item["hz"] for item in bass])
@@ -155,7 +156,9 @@ def detect_harmony(samples, freqs, spectrum, pulse):
     return beat_chroma, energy, bass_pc, bass_conf, meter, key, downbeats
 
 
-def label_local_bars(pulse, beat_chroma, energy, bass_pc, bass_conf, key, meter, downbeats, samples):
+def label_local_bars(
+    pulse, beat_chroma, energy, bass_pc, bass_conf, key, meter, downbeats, samples
+):
     chords = label_chords(
         beat_chroma,
         energy,
@@ -225,7 +228,21 @@ def map_form(path, samples, bars, key, bar_chroma=None):
         return sections, voice, patterns, section_detector
 
 
-def chart_document(path, duration, pulse, meter, key, bars, detector, sections, voice, patterns, section_detector, stages, total):
+def chart_document(
+    path,
+    duration,
+    pulse,
+    meter,
+    key,
+    bars,
+    detector,
+    sections,
+    voice,
+    patterns,
+    section_detector,
+    stages,
+    total,
+):
     ruled = sum(1 for bar in bars if bar.get("origem") == "regra")
     return {
         "arquivo": path.name,
@@ -338,7 +355,9 @@ def analyze(path: Path) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Mapeia pulsação, compasso, cifras e seções de um áudio.")
+    parser = argparse.ArgumentParser(
+        description="Mapeia pulsação, compasso, cifras e seções de um áudio."
+    )
     parser.add_argument("audio", nargs="?", type=Path)
     args = parser.parse_args()
     audio = (args.audio if args.audio else find_default_audio()).expanduser().resolve()
@@ -348,7 +367,9 @@ def main() -> None:
     out_dir = ROOT / "cifras" / "saida"
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = {key: value for key, value in result.items() if key != "cifra"}
-    (out_dir / f"{audio.stem}.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out_dir / f"{audio.stem}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     (out_dir / f"{audio.stem}.txt").write_text(result["cifra"], encoding="utf-8")
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stdout.write(result["cifra"])

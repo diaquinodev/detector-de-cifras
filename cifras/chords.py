@@ -96,14 +96,23 @@ def estimate_key(
             if chosen["score"] >= best["score"] * KEY_BASS_SCORE_RATIO:
                 best = chosen
     presence = bar_presence(beat_chroma, energy, beats_per_bar, phase, downbeats)
-    temperley = max(profile_scores(presence, TEMPERLEY_MAJOR, TEMPERLEY_MINOR), key=lambda item: item["score"])
+    temperley = max(
+        profile_scores(presence, TEMPERLEY_MAJOR, TEMPERLEY_MINOR), key=lambda item: item["score"]
+    )
     dominant = best
     fifth_below = (best["tonic"] - 7) % 12
-    fifth_key = max((item for item in ranked if item["tonic"] == fifth_below), key=lambda item: item["score"])
+    fifth_key = max(
+        (item for item in ranked if item["tonic"] == fifth_below), key=lambda item: item["score"]
+    )
     switched = False
-    if temperley["tonic"] == fifth_below and fifth_key["score"] >= best["score"] * KEY_FIFTH_SCORE_RATIO:
+    if (
+        temperley["tonic"] == fifth_below
+        and fifth_key["score"] >= best["score"] * KEY_FIFTH_SCORE_RATIO
+    ):
         matched = [
-            item for item in ranked if item["tonic"] == temperley["tonic"] and item["mode"] == temperley["mode"]
+            item
+            for item in ranked
+            if item["tonic"] == temperley["tonic"] and item["mode"] == temperley["mode"]
         ]
         best = matched[0] if matched else fifth_key
         switched = True
@@ -141,7 +150,9 @@ def chord_templates() -> tuple[np.ndarray, list[str]]:
     for suffix, intervals in CHORD_KINDS:
         vector = np.zeros(12)
         for tone in intervals:
-            vector[tone] = SEVENTH_TONE_WEIGHT if tone == intervals[-1] and len(intervals) > 3 else 1.0
+            vector[tone] = (
+                SEVENTH_TONE_WEIGHT if tone == intervals[-1] and len(intervals) > 3 else 1.0
+            )
         vector /= np.linalg.norm(vector)
         vectors.append(vector)
         suffixes.append(suffix)
@@ -220,7 +231,11 @@ def relative_minor_seventh(chroma: np.ndarray, bass_pc: int) -> bool:
     peak = float(np.max(chroma))
     if peak < EPS or bass_pc < 0:
         return False
-    order = [int(pitch) for pitch in np.argsort(chroma)[::-1] if chroma[int(pitch)] >= peak * RELATIVE_M7_PEAK_FRACTION]
+    order = [
+        int(pitch)
+        for pitch in np.argsort(chroma)[::-1]
+        if chroma[int(pitch)] >= peak * RELATIVE_M7_PEAK_FRACTION
+    ]
     if len(order) < 3:
         return False
     triad = major_triad_root(order[:3])
@@ -249,7 +264,9 @@ def demote_sus4(choice: int, bar_scores: np.ndarray, kinds: int) -> int:
     return choice
 
 
-def rootless_sus4(choice: int, bar_chroma: np.ndarray, bar_scores: np.ndarray, kinds: int, bass_pc: int | None) -> int:
+def rootless_sus4(
+    choice: int, bar_chroma: np.ndarray, bar_scores: np.ndarray, kinds: int, bass_pc: int | None
+) -> int:
     """Sus4 sem a fundamental no croma nem no baixo volta para o outro gabarito."""
     if choice % kinds != kind_index("sus4"):
         return choice
@@ -311,13 +328,19 @@ def half_bar_seventh(
     return first, second, root * kinds + seventh
 
 
-def choose_beat_state(column: np.ndarray, previous_root: int | None, kinds: int, diatonic: set[int]) -> int:
+def choose_beat_state(
+    column: np.ndarray, previous_root: int | None, kinds: int, diatonic: set[int]
+) -> int:
     order = np.argsort(column)
     best = int(order[-1])
     second = int(order[-2])
     choice = best
     if previous_root is not None and column[best] < column[second] * CLOSE_SCORE_RATIO:
-        near = [int(state) for state in range(column.size) if column[state] >= column[best] * NEAR_SCORE_RATIO]
+        near = [
+            int(state)
+            for state in range(column.size)
+            if column[state] >= column[best] * NEAR_SCORE_RATIO
+        ]
         in_key = [state for state in near if state // kinds in diatonic]
         pool = in_key or near
         step_up = (previous_root + 2) % 12
@@ -330,7 +353,14 @@ def choose_beat_state(column: np.ndarray, previous_root: int | None, kinds: int,
     return choice
 
 
-def demote_slash_seventh(choice: int, suffix: str, slash: int | None, bar_chroma: np.ndarray, kinds: int, suffixes: list[str]) -> tuple[int, str]:
+def demote_slash_seventh(
+    choice: int,
+    suffix: str,
+    slash: int | None,
+    bar_chroma: np.ndarray,
+    kinds: int,
+    suffixes: list[str],
+) -> tuple[int, str]:
     root = choice // kinds
     if slash is None or suffix not in {"7", "m7"} or (root + 10) % 12 != slash:
         return choice, suffix
@@ -420,7 +450,11 @@ def label_chords(
         choice = demote_sus4(choice, bar_scores, kinds)
         choice = rootless_sus4(choice, bar_chroma, bar_scores, kinds, common)
         same_root = previous_state is not None and previous_state // kinds == choice // kinds
-        if same_root and not bass_forced and bar_scores[choice] < bar_scores[previous_state] * CLOSE_SCORE_RATIO:
+        if (
+            same_root
+            and not bass_forced
+            and bar_scores[choice] < bar_scores[previous_state] * CLOSE_SCORE_RATIO
+        ):
             choice = previous_state
         root = choice // kinds
         suffix = suffixes[choice % kinds]
@@ -505,7 +539,9 @@ def bars_from(
             held = notes
         elif not any(item["label"] != "N" for item in chosen):
             held = ["N"]
-        end = float(beat_times[stop]) if stop < beat_times.size else float(beat_times[-1] + interval)
+        end = (
+            float(beat_times[stop]) if stop < beat_times.size else float(beat_times[-1] + interval)
+        )
         confidences = [item["confidence"] for item in chosen]
         bars.append(
             {

@@ -19,14 +19,16 @@ def bars_of(chord: str, count: int) -> list[dict]:
     for index in range(count):
         start = float(index)
         end = start + 1.0
-        rows.append({
-            "bar": index + 1,
-            "start": start,
-            "end": end,
-            "chords": [chord],
-            "events": [{"chord": chord, "start": start, "end": end, "confidence": 0.8}],
-            "confidence": 0.8,
-        })
+        rows.append(
+            {
+                "bar": index + 1,
+                "start": start,
+                "end": end,
+                "chords": [chord],
+                "events": [{"chord": chord, "start": start, "end": end, "confidence": 0.8}],
+                "confidence": 0.8,
+            }
+        )
     return rows
 
 

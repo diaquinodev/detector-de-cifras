@@ -75,7 +75,9 @@ def decode_bar_positions(probabilities: np.ndarray, beats_per_bar: int) -> np.nd
             candidates = []
             if position == 0:
                 candidates.append((score[positions - 1] + stay, positions - 1))
-                candidates.extend((score[early] + change, early) for early in range(1, positions - 1))
+                candidates.extend(
+                    (score[early] + change, early) for early in range(1, positions - 1)
+                )
             else:
                 candidates.append((score[position - 1] + stay, position - 1))
                 if position == positions - 1:
@@ -121,7 +123,9 @@ def recognize(samples: np.ndarray, sample_rate: int) -> dict:
         beats = np.r_[beats, beats[-1] + interval]
         after += 1
 
-    matched = np.asarray([int(np.argmin(np.abs(original - value))) + offset for value in downbeats], dtype=int)
+    matched = np.asarray(
+        [int(np.argmin(np.abs(original - value))) + offset for value in downbeats], dtype=int
+    )
     matched = np.unique(matched)
     differences = np.diff(matched)
     valid = differences[(differences >= BAR_LENGTH_MIN) & (differences <= BAR_LENGTH_MAX)]

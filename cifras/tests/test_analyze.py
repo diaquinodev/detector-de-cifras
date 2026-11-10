@@ -33,10 +33,31 @@ class AnalyzeDocumentTest(unittest.TestCase):
             "downbeat_indexes": [0],
         }
         key = {"name": "C", "mode": "maior", "score": 0.8, "reference": 440.0, "cents": 0.0}
-        bars = [{"bar": 1, "start": 0.0, "end": 2.0, "chords": ["C"], "origem": "regra", "confidence": 0.5}]
+        bars = [
+            {
+                "bar": 1,
+                "start": 0.0,
+                "end": 2.0,
+                "chords": ["C"],
+                "origem": "regra",
+                "confidence": 0.5,
+            }
+        ]
         sections = [{"name": "verso", "start": 0.0, "end": 2.0, "bars": bars}]
         document = chart_document(
-            path, 2.0, pulse, meter, key, bars, "btc", sections, {}, [], "ciclos", {}, 1.0,
+            path,
+            2.0,
+            pulse,
+            meter,
+            key,
+            bars,
+            "btc",
+            sections,
+            {},
+            [],
+            "ciclos",
+            {},
+            1.0,
         )
         self.assertEqual(document["arquivo"], "faixa.wav")
         self.assertEqual(document["tom"]["nota"], "C")
