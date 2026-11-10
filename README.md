@@ -58,5 +58,5 @@ python -m ruff check . && python -m ruff format --check . && python -m pytest
 ```
 
 A verificação só precisa de `numpy`, `scipy`, `pytest` e `ruff` (`requirements-test.txt`).
-Sem o `torch` instalado, os 5 testes da conversão do BTC aparecem como pulados; o CI instala
+Sem o `torch` instalado, os 7 testes da conversão do BTC aparecem como pulados; o CI instala
 o `torch` de CPU e roda todos.
