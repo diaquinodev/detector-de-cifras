@@ -1,0 +1,9 @@
+numpy
+scipy
+imageio-ffmpeg
+librosa
+torch
+transformers
+beat-this
+all-in-one-infer @ git+https://github.com/openmirlab/all-in-one-infer.git
+yt-dlp

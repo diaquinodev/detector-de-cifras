@@ -1,0 +1,10 @@
+{
+  "model_type": "btc_chord",
+  "model_name": "BTC-ISMIR19",
+  "large_voca": true,
+  "sample_rate": 22050,
+  "auto_map": {
+    "AutoConfig": "modeling_btc.BTCChordConfig",
+    "AutoModel": "modeling_btc.BTCForChordRecognition"
+  }
+}
