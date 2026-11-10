@@ -18,4 +18,7 @@
 - `btc_src/features.py`: parâmetro `tuning` repassado ao `librosa.cqt`.
 - `btc_src/btc_model.py` e `btc_src/transformer_modules.py`: sem alteração.
 
-Os pesos (`*.pt`) não estão no repositório; ver o README da raiz.
+Os pesos (`*.pt`) não estão no repositório. `python scripts/baixar_modelos.py` baixa o
+`btc_model_large_voca.pt` do repositório original (SHA-256 fixo no script; o arquivo do
+empacotamento tem o mesmo SHA-256, conferido em 2026-11-10) e grava o
+`btc_model_large_voca_safe.pt`.

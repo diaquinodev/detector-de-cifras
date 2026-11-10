@@ -17,9 +17,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Os testes não usam torch nem os pesos dos modelos; o requirements.txt completo
-      # (torch, transformers, beat-this) fica para quem roda o detector de verdade.
+      # Os testes não usam os pesos dos modelos; o requirements.txt completo
+      # (transformers, beat-this, librosa) fica para quem roda o detector de verdade.
       - run: pip install -r requirements-test.txt
+      # torch só de CPU: sem ele os testes da conversão do BTC seriam pulados.
+      - run: pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
       - run: python -m ruff check .
       - run: python -m ruff format --check .
       - run: python -m pytest
