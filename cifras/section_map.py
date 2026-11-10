@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import Counter
 
 import numpy as np
-
 from constants import (
     BRIDGE_FRACTION,
     CHEST_ONSET_CANDIDATES,

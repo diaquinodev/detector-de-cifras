@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import threading
+import hashlib
 import subprocess
 import tempfile
-import hashlib
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
-
 
 LABELS = {
     "start": "silêncio",
@@ -99,7 +98,7 @@ def _decoded_input(path: Path):
 
     with tempfile.TemporaryDirectory(prefix="cifra-estrutura-") as directory:
         fingerprint = hashlib.sha1(
-            f"{path.resolve()}:{path.stat().st_size}:{path.stat().st_mtime_ns}".encode("utf-8")
+            f"{path.resolve()}:{path.stat().st_size}:{path.stat().st_mtime_ns}".encode()
         ).hexdigest()[:10]
         target = Path(directory) / f"{path.stem}-{fingerprint}.wav"
         completed = subprocess.run(
@@ -137,7 +136,7 @@ def cached_ai_labels(
     if not bars:
         return None, None
     fingerprint = hashlib.sha1(
-        f"{path.resolve()}:{path.stat().st_size}:{path.stat().st_mtime_ns}".encode("utf-8")
+        f"{path.resolve()}:{path.stat().st_size}:{path.stat().st_mtime_ns}".encode()
     ).hexdigest()[:10]
     stem_name = (
         f"{path.stem}-{fingerprint}" if path.suffix.lower() not in {".wav", ".flac"} else path.stem

@@ -55,7 +55,6 @@ def references(jams_path: Path, folder: Path) -> tuple[Path, Path, float]:
 
 def run(root: Path) -> None:
     import mir_eval
-
     from analyze import analyze
     from avaliar import evaluate_beats, evaluate_chords
 
@@ -158,7 +157,7 @@ def summary(root: Path) -> dict:
             for style, group in sorted(styles.items())
         },
         "piores_majmin": sorted(
-            ((entry["acordes"]["final"]["majmin"], entry["trecho"]) for entry in good)
+            (entry["acordes"]["final"]["majmin"], entry["trecho"]) for entry in good
         )[:8],
     }
 

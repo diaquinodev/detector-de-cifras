@@ -5,9 +5,6 @@ from __future__ import annotations
 import sys
 
 import numpy as np
-from scipy import signal
-from scipy.ndimage import uniform_filter1d
-
 from constants import (
     BAR_OFFSET_PRINT_MS,
     CHEST_BAND,
@@ -32,6 +29,8 @@ from constants import (
     SINGING_PERCENTILE_GAIN,
     VOICE_REENTRY_QUIET,
 )
+from scipy import signal
+from scipy.ndimage import uniform_filter1d
 
 
 def band_envelope(samples: np.ndarray, low: float, high: float) -> np.ndarray:

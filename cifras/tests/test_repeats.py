@@ -14,7 +14,6 @@ sys.path.insert(0, str(CIFRAS))
 from repeats import _explains_better, chroma_by_bar, lock_repeated_phrases  # noqa: E402
 from section_map import map_sections_with_theory  # noqa: E402
 
-
 ROOTS = {
     "C": 0,
     "Cm": 0,

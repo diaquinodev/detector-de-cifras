@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy import signal
-from scipy.optimize import nnls
-
 from constants import (
     A4_HZ,
     A4_MIDI,
@@ -36,6 +33,8 @@ from constants import (
     TUNING_CONFIDENCE,
     TUNING_MIN_SAMPLES,
 )
+from scipy import signal
+from scipy.optimize import nnls
 
 
 def bass_bandpass(samples: np.ndarray) -> np.ndarray:

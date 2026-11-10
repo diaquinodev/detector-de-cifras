@@ -6,8 +6,6 @@ import sys
 import unittest
 from pathlib import Path
 
-import numpy as np
-
 CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 

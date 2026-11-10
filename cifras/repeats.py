@@ -13,7 +13,6 @@ de fora: a cadência da volta seguinte costuma mudar.
 from __future__ import annotations
 
 import numpy as np
-
 from constants import (
     BTC_INTERVALS,
     REPEAT_ALIGN_MARGIN,

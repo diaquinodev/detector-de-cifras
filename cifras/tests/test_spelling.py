@@ -10,8 +10,8 @@ CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 
 from spelling import (  # noqa: E402
-    bar_similarity,
     bar_signature,
+    bar_similarity,
     parse_chord_symbol,
     respell_chord_symbol,
     roman_and_function,

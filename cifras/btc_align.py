@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from chords import chord_root_name, profile_scores
 from constants import (
     BASS_INTERVAL_PAD_S,

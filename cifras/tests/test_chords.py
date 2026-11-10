@@ -12,8 +12,8 @@ CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 
 from chords import (  # noqa: E402
-    chord_root_name,
     choose_beat_state,
+    chord_root_name,
     fold_bar,
     kind_index,
     major_triad_root,

@@ -6,8 +6,6 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-from scipy import signal
-
 from constants import (
     AUDIO_SUFFIXES,
     HOP,
@@ -17,6 +15,7 @@ from constants import (
     SAMPLE_RATE,
     SKIPPED_AUDIO_DIRS,
 )
+from scipy import signal
 
 
 def find_default_audio() -> Path:

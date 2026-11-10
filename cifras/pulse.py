@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy import signal
-from scipy.ndimage import uniform_filter1d
-
 from audio import magnitude
 from constants import (
     BAR_OFFSET_LAG_S,
@@ -46,6 +43,8 @@ from constants import (
     TEMPO_MAX_BPM,
     TEMPO_MIN_BPM,
 )
+from scipy import signal
+from scipy.ndimage import uniform_filter1d
 
 
 def onset_envelope(magnitude_spectrum: np.ndarray) -> np.ndarray:

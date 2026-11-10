@@ -12,6 +12,7 @@ import numpy as np
 CIFRAS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CIFRAS))
 
+import servir  # noqa: E402
 from beat_detector import decode_bar_positions  # noqa: E402
 from harmonic_structure import (  # noqa: E402
     detect_key_modulation,
@@ -20,7 +21,6 @@ from harmonic_structure import (  # noqa: E402
     override_bar,
     spell_with,
 )
-import servir  # noqa: E402
 
 
 def probabilities_for(
@@ -238,7 +238,8 @@ class ModulationTest(unittest.TestCase):
 
 class ChordOnsetTest(unittest.TestCase):
     def setUp(self):
-        from analyze import PITCHES_SHARP, btc_bars
+        from analyze import btc_bars
+        from constants import PITCHES_SHARP
 
         self.names = PITCHES_SHARP
         self.btc_bars = btc_bars
@@ -289,7 +290,8 @@ class RootSupportTest(unittest.TestCase):
     """O croma é (12, tempos). Do tempo 12 em diante a coluna tem de valer."""
 
     def bars_for(self, chroma):
-        from analyze import PITCHES_SHARP, btc_bars
+        from analyze import btc_bars
+        from constants import PITCHES_SHARP
 
         beats = np.arange(0.0, 8.01, 0.5)
         local = [{"label": "C", "confidence": 0.8} for _ in range(beats.size)]
@@ -324,7 +326,8 @@ class RootSupportTest(unittest.TestCase):
         self.assertEqual(self.bars_for(chroma), ["C", "G", "C"])
 
     def test_confident_change_survives_a_quiet_root(self):
-        from analyze import PITCHES_SHARP, btc_bars
+        from analyze import btc_bars
+        from constants import PITCHES_SHARP
 
         beats = np.arange(0.0, 8.01, 0.5)
         chroma = np.zeros((12, beats.size))
@@ -351,7 +354,7 @@ class RootSupportTest(unittest.TestCase):
 
 class SlashBassTest(unittest.TestCase):
     def bass(self, notes, confidence=0.95):
-        from analyze import interval_bass
+        from btc_align import interval_bass
 
         beats = np.arange(0.0, 2.0, 0.5)
         return interval_bass(0.0, 2.0, beats, np.asarray(notes), np.full(len(notes), confidence))

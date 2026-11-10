@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from constants import (
     BASS_MIN_NOTES,
     BASS_SPELL_CLOSE_RATIO,

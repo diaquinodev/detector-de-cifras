@@ -20,7 +20,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-
 from avaliar import to_harte
 
 HERE = Path(__file__).resolve().parent

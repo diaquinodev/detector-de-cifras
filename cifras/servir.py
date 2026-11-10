@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 import analyze
+from constants import MAX_AUDIO_SECONDS
 
 ROOT = analyze.ROOT
 OUT = ROOT / "cifras" / "saida"
@@ -261,9 +262,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_bytes(STYLES.read_bytes(), "text/css; charset=utf-8")
             return
         if parsed.path == "/api/config":
-            self._send_json(
-                {"youtube": YOUTUBE_ENABLED, "max_audio_min": analyze.MAX_AUDIO_SECONDS // 60}
-            )
+            self._send_json({"youtube": YOUTUBE_ENABLED, "max_audio_min": MAX_AUDIO_SECONDS // 60})
             return
         if parsed.path == "/api/musicas":
             songs = [
