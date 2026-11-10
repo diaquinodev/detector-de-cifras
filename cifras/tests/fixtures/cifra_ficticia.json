@@ -1,0 +1,29 @@
+{
+  "arquivo": "cifra_ficticia.mp3",
+  "compassos": [
+    {
+      "bar": 1,
+      "start": 0.0,
+      "end": 2.32,
+      "chords": ["Am", "Am7"],
+      "events": [
+        {"chord": "Am", "start": 0.0, "end": 1.16},
+        {"chord": "Am7", "start": 1.16, "end": 2.32}
+      ]
+    },
+    {
+      "bar": 2,
+      "start": 2.32,
+      "end": 4.64,
+      "chords": ["G"],
+      "events": [{"chord": "G", "start": 2.32, "end": 4.64}]
+    },
+    {
+      "bar": 3,
+      "start": 4.64,
+      "end": 6.96,
+      "chords": ["E"],
+      "events": []
+    }
+  ]
+}

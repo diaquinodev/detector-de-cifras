@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cifra local</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <h1>Cifra local</h1>
+      <p class="lede">Escolha a faixa. A cifra abre na grade, com o transporte em cima.</p>
+      <div class="importer">
+        <h2>Trazer áudio</h2>
+        <label for="audio-file">Subir MP3, WAV ou FLAC</label>
+        <input id="audio-file" type="file" accept=".mp3,.wav,.flac,audio/*">
+        <div class="file-name" id="file-name">Nenhum arquivo escolhido</div>
+        <button id="upload" type="button" disabled>Enviar e analisar</button>
+        <div id="youtube-box" hidden>
+          <label for="youtube-url">Ou cole um link do YouTube</label>
+          <input id="youtube-url" type="url" placeholder="https://youtu.be/…">
+          <button id="youtube" type="button">Baixar e analisar</button>
+        </div>
+        <div class="import-status" id="import-status" role="status"></div>
+      </div>
+      <section class="library" aria-labelledby="library-title">
+        <div class="library-head">
+          <h2 id="library-title">Faixas</h2>
+          <input id="song-filter" type="search" placeholder="Filtrar pelo nome" aria-label="Filtrar faixas">
+        </div>
+        <div class="songs" id="songs"></div>
+      </section>
+    </aside>
+    <main>
+      <section class="stage" id="stage">
+        <header class="sheet-head">
+          <div>
+            <h2 id="song-title">Cifra local</h2>
+            <p class="meta" id="song-meta"></p>
+          </div>
+          <span class="clock" id="playhead">0:00 / 0:00</span>
+        </header>
+        <div class="toolbar" id="toolbar" role="toolbar" aria-label="Transporte">
+          <button id="play-toggle" type="button" disabled>Tocar</button>
+          <button id="count-in" class="toggle-btn" type="button" aria-pressed="false" disabled>Contagem</button>
+          <strong id="count-readout" hidden>1</strong>
+          <div class="stepper" aria-label="Andamento">
+            <button id="bpm-down" type="button" disabled aria-label="Diminuir BPM">−</button>
+            <button id="bpm-readout" type="button" disabled title="Clique para voltar ao BPM original">120</button>
+            <button id="bpm-up" type="button" disabled aria-label="Aumentar BPM">+</button>
+          </div>
+          <div class="stepper" aria-label="Transposição">
+            <button id="transpose-down" type="button" disabled aria-label="Descer um semitom">−</button>
+            <button id="transpose-readout" type="button" disabled title="Clique para voltar ao tom original">0</button>
+            <button id="transpose-up" type="button" disabled aria-label="Subir um semitom">+</button>
+          </div>
+          <button id="loop-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled>Loop</button>
+          <button id="edit-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled>Editar</button>
+          <button class="toggle-btn" id="toggle-notation" type="button" aria-pressed="false">Δ / #</button>
+          <button class="toggle-btn" id="toggle-model" type="button" aria-pressed="false">Modelo</button>
+        </div>
+        <audio id="player" controls preload="metadata"></audio>
+        <p class="tool-hint" id="tool-hint">Clique num acorde para ouvir dali.</p>
+        <div class="song-map" id="song-map" hidden></div>
+      </section>
+      <article class="sheet" id="sheet">
+        <p class="empty">Carregando as faixas.</p>
+      </article>
+    </main>
+  </div>
+  <script>
+    const songsEl = document.querySelector("#songs");
+    const sheet = document.querySelector("#sheet");
+    let current = null;
+    let audio = null;
+    let chordifyNotation = false;
+    let modelOnly = false;
+    let lastChart = null;
+    let semitones = 0;
+    let bpmTarget = null;
+    let loopMode = false;
+    let editMode = false;
+    let countInOn = false;
+    let loopRange = null;
+    let loopAnchor = null;
+    let transportTrack = null;
+    let countToken = 0;
+    let skipCount = false;
+    let audioCtx = null;
+    let directGain = null;
+    let pitchNode = null;
+    let frame = 0;
+    const LOW_CONFIDENCE = 0.4;
+    const PITCH_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const FLAT_NAMES = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#" };
+    const FLAT_SPELLING = { 1: "Db", 3: "Eb", 6: "Gb", 8: "Ab", 10: "Bb" };
+
+    const SHARP_MAP = {
+      "Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#"
+    };
+
+    function pitchClass(name) {
+      const spelled = FLAT_NAMES[name] || name;
+      return PITCH_NAMES.indexOf(spelled);
+    }
+
+    function preferFlats() {
+      const tom = lastChart && lastChart.tom;
+      if (!tom || !tom.nota) return false;
+      const tonic = (pitchClass(tom.nota) + semitones + 120) % 12;
+      const major = String(tom.modo || "").startsWith("men") ? (tonic + 3) % 12 : tonic;
+      return [false, true, false, true, false, true, false, false, true, false, true, false][major];
+    }
+
+    function spellRoot(pc, flats) {
+      const index = (pc + 120) % 12;
+      if (flats && FLAT_SPELLING[index]) return FLAT_SPELLING[index];
+      return PITCH_NAMES[index];
+    }
+
+    function transposeSymbol(symbol, steps) {
+      const raw = String(symbol ?? "N").trim();
+      if (!steps || !raw || raw === "N" || raw === "N.C.") return raw;
+      const flats = preferFlats();
+      return raw.split("/").map((part) => {
+        const match = part.match(/^([A-G][b#]?)(.*)$/);
+        if (!match || pitchClass(match[1]) < 0) return part;
+        return spellRoot(pitchClass(match[1]) + steps, flats) + match[2];
+      }).join("/");
+    }
+
+    function chordIdentity(symbol) {
+      const raw = String(symbol ?? "N").trim();
+      if (!raw || raw === "N" || raw.toUpperCase() === "N.C.") return "N";
+      return raw.split("/").map((part) => {
+        const match = part.match(/^([A-G][b#]?)(.*)$/);
+        if (!match || pitchClass(match[1]) < 0) return part;
+        return pitchClass(match[1]) + ":" + match[2];
+      }).join("/");
+    }
+
+    function normalizeChord(text) {
+      const value = String(text || "").trim();
+      if (value.toUpperCase() === "N.C." || value.toUpperCase() === "N") return "N";
+      return value;
+    }
+
+    function formatChord(symbol) {
+      const raw = String(symbol ?? "N").trim();
+      if (!raw || raw === "N") return chordifyNotation ? "N.C." : "N";
+      if (!chordifyNotation) return raw;
+      return raw.split("/").map((part, idx) => {
+        const m = part.match(/^([A-G][b#]?)(.*)$/);
+        if (!m) return part;
+        const root = SHARP_MAP[m[1]] || m[1];
+        let suffix = m[2];
+        if (idx === 0) {
+          suffix = suffix.replace(/^maj7/, "Δ").replace(/^mMaj7/, "mΔ");
+        }
+        return root + suffix;
+      }).join("/");
+    }
+
+    function shownChord(symbol) {
+      return formatChord(transposeSymbol(symbol, semitones));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[char]));
+    }
+
+    function clock(seconds) {
+      const whole = Math.max(0, Math.round(seconds || 0));
+      return Math.floor(whole / 60) + ":" + String(whole % 60).padStart(2, "0");
+    }
+
+    function sectionKind(name) {
+      const text = String(name || "").toLowerCase();
+      if (text.includes("pré-refrão") || text.includes("pre-refrao") || text.includes("pré-refrao")) return "prechorus";
+      if (text.includes("refrão") || text.includes("refrao")) return "chorus";
+      if (text.includes("verso")) return "verse";
+      if (text.includes("ponte")) return "bridge";
+      if (text.includes("intro")) return "intro";
+      if (text.includes("outro")) return "outro";
+      return "other";
+    }
+
+    function headerLines(chart) {
+      return chart.texto.split(/\r?\n/).filter((line) => {
+        if (!line || line.startsWith(" ") || line === chart.nome) return false;
+        return !line.includes("–");
+      });
+    }
+
+    function songButton(song) {
+      const state = song.medida ? "cifra pronta" : "ainda sem cifra";
+      return `<button type="button" data-faixa="${escapeHtml(song.faixa)}"><span>${escapeHtml(song.nome)}</span><small>${state}</small></button>`;
+    }
+
+    function barView(bar) {
+      const ruled = bar.origem === "regra" && Array.isArray(bar.events_modelo);
+      const showModel = modelOnly && ruled;
+      const chords = showModel ? (bar.chords_modelo || ["N"]) : (bar.chords || ["N"]);
+      const sourceEvents = showModel ? bar.events_modelo : bar.events;
+      const measured = Boolean(sourceEvents && sourceEvents.length);
+      const events = measured
+        ? sourceEvents
+        : chords.map((chord, index) => {
+            const duration = (Number(bar.end) - Number(bar.start)) / chords.length;
+            const start = Number(bar.start) + duration * index;
+            return {
+              chord,
+              start,
+              end: index + 1 === chords.length ? Number(bar.end) : start + duration,
+            };
+          });
+      return { ruled, showModel, chords, events, measured };
+    }
+
+    function beatsPerBar() {
+      const match = String(lastChart && lastChart.compasso || "").match(/(\d+)/);
+      const beats = match ? Number(match[1]) : 4;
+      return Math.min(8, Math.max(1, beats || 4));
+    }
+
+    function placeOnBeats(bar, events, beats) {
+      const start = Number(bar.start);
+      const end = Number(bar.end);
+      const raw = events.map((event, index) => {
+        const from = Math.max(start, Math.min(end, Number(event.start)));
+        const to = Math.max(from, Math.min(end, Number(event.end)));
+        return { event, index, weight: Math.max(0.001, to - from) };
+      });
+      if (!raw.length) return [];
+      if (raw.length >= beats) {
+        return raw.slice(0, beats).map((item, index) => ({ ...item, from: index, span: 1 }));
+      }
+      const spans = raw.map(() => 1);
+      const spare = beats - raw.length;
+      const total = raw.reduce((sum, item) => sum + item.weight, 0);
+      const shares = raw.map((item) => (item.weight / total) * spare);
+      const floors = shares.map((value) => Math.floor(value));
+      floors.forEach((value, index) => { spans[index] += value; });
+      let remain = spare - floors.reduce((sum, value) => sum + value, 0);
+      const order = shares
+        .map((value, index) => ({ index, frac: value - Math.floor(value) }))
+        .sort((a, b) => b.frac - a.frac);
+      for (let step = 0; step < remain; step += 1) spans[order[step].index] += 1;
+      let cursor = 0;
+      return raw.map((item, index) => {
+        const placed = { ...item, from: cursor, span: spans[index] };
+        cursor += spans[index];
+        return placed;
+      });
+    }
+
+    function beatWindow(bar, beat, beats) {
+      const start = Number(bar.start);
+      const end = Number(bar.end);
+      const step = (end - start) / Math.max(1, beats);
+      return { beatStart: start + step * beat, beatEnd: start + step * (beat + 1) };
+    }
+
+    function beatButtons(bar, placed, beats, measured, fonte) {
+      const slots = Array.from({ length: beats }, () => null);
+      placed.forEach((item) => {
+        for (let offset = 0; offset < item.span; offset += 1) {
+          const beat = item.from + offset;
+          if (beat >= 0 && beat < beats) slots[beat] = { item, lead: offset === 0, beat };
+        }
+      });
+      return slots.map((slot, beat) => {
+        const window = beatWindow(bar, beat, beats);
+        if (!slot) {
+          return `<button class="chord-part chord-empty" type="button" data-beat="${beat}" data-beat-start="${window.beatStart}" data-beat-end="${window.beatEnd}" data-start="${Number(bar.start)}" data-end="${Number(bar.end)}" data-bar="${Number(bar.bar)}" aria-hidden="true"></button>`;
+        }
+        const event = slot.item.event;
+        const confidence = event.confidence ?? bar.confidence;
+        const rest = event.chord === "N";
+        const low = confidence != null && Number(confidence) < LOW_CONFIDENCE && !rest;
+        const tip = [editMode ? "Clique para editar este acorde" : "Clique para ouvir este trecho"];
+        if (confidence != null) tip.push(`confiança ${Math.round(Number(confidence) * 100)}%`);
+        if (!measured) tip.push("tempo de troca aproximado");
+        if (event.origem === "regra") tip.push("tempo dividido por igual pela regra");
+        tip.push(slot.item.span === 1 ? "1 tempo" : `${slot.item.span} tempos`);
+        const label = slot.lead ? escapeHtml(shownChord(event.chord)) : "";
+        const kind = slot.lead ? (rest ? "chord-hit rest" : "chord-hit") : "chord-hold";
+        return `<button class="chord-part ${kind}${low ? " low" : ""}" type="button" data-beat="${beat}" data-beat-start="${window.beatStart}" data-beat-end="${window.beatEnd}" data-start="${Number(event.start)}" data-end="${Number(event.end)}" data-bar="${Number(bar.bar)}" data-index="${slot.item.index}" data-chord="${escapeHtml(event.chord)}" data-fonte="${fonte}" title="${escapeHtml(tip.join(" · "))}">${label}</button>`;
+      }).join("");
+    }
+
+    function loopMark(bar) {
+      const number = Number(bar.bar);
+      if (loopAnchor && Number(loopAnchor.bar) === number) return " loop-from";
+      if (!loopRange) return "";
+      const start = Number(bar.start);
+      const end = Number(bar.end);
+      if (end <= loopRange.start || start >= loopRange.end) return "";
+      return " in-loop";
+    }
+
+    function renderChart(chart) {
+      const main = document.querySelector("main");
+      const scroll = main.scrollTop;
+      lastChart = chart;
+      highlight.bar = null;
+      syncTransport(chart);
+      const src = "/audio?faixa=" + encodeURIComponent(chart.faixa);
+      useTrackAudio(src);
+      const key = chart.tom ? transposeSymbol(chart.tom.nota, semitones) + " " + chart.tom.modo : "";
+      const meta = [key, chart.compasso || ""].filter(Boolean);
+      document.querySelector("#song-title").textContent = chart.nome;
+      document.querySelector("#song-meta").innerHTML = meta.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
+      const mod = chart.tom && chart.tom.modulacao;
+      const modFact = mod ? `Modulação: ${mod.new_name_flat}/${mod.new_name_sharp} ${mod.new_mode || "maior"} (c.${mod.start_bar + 1})` : "";
+      const extraFacts = [
+        modFact,
+        chart.tom && chart.tom.afinacao_hz ? chart.tom.afinacao_hz.toFixed(1) + " Hz" : "",
+        chart.ajustados_por_regra ? chart.ajustados_por_regra + " compasso(s) ajustados por regra" : "",
+        semitones ? `Transposição ${semitones > 0 ? "+" : ""}${semitones} semitons, com o áudio na mesma direção` : "",
+      ].filter(Boolean);
+      const notes = headerLines(chart).filter((line) => !/^(Tom|Pulsação|Compasso|Afinação|Ciclo ):/.test(line));
+      const repeatedPatterns = (chart.padroes_harmonicos || []).filter((pat) => (pat.repeticoes || 0) >= 2).slice(0, 4);
+      const patternsHtml = repeatedPatterns.length
+        ? `<div class="patterns" aria-label="Padrões harmônicos repetidos">${repeatedPatterns.map((pat) => {
+            const chordsList = (pat.acordes || []).map((barStr) => barStr.split(/\s+/).map((item) => shownChord(item)).join(" "));
+            const chordsText = chordsList.join(" | ");
+            const degreesText = (pat.graus || []).join(" – ");
+            return `<div class="pattern-card">
+              <strong>${escapeHtml(pat.id)} · ${Number(pat.repeticoes)}x (${Number(pat.compassos_por_ciclo)} compassos)</strong>
+              <div class="pat-chords">${escapeHtml(chordsText)}</div>
+              <div class="pat-theory">${escapeHtml(degreesText)}${pat.cadencia ? " · " + escapeHtml(pat.cadencia) : ""}</div>
+            </div>`;
+          }).join("")}</div>`
+        : "";
+      const timeline = chart.secoes.map((section) => {
+        const duration = Math.max(0.01, Number(section.end) - Number(section.start));
+        const extra = [section.padrao, section.graus, section.cadencia].filter(Boolean).join(" · ");
+        const label = `${section.name} ${clock(section.start)}–${clock(section.end)}${extra ? " (" + extra + ")" : ""}`;
+        const kind = sectionKind(section.name);
+        return `<button class="map-part" type="button" data-kind="${kind}" style="flex-grow:${duration}" data-start="${Number(section.start)}" data-end="${Number(section.end)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(section.name)}"></button>`;
+      }).join("");
+      const map = document.querySelector("#song-map");
+      map.innerHTML = timeline;
+      map.hidden = !timeline;
+      const parts = chart.secoes.map((section) => {
+        const rows = [];
+        for (let index = 0; index < section.bars.length; index += 4) {
+          rows.push(section.bars.slice(index, index + 4));
+        }
+        const theory = [section.padrao, section.graus, section.cadencia].filter((item) => item && item !== "silêncio").join(" · ");
+        const body = rows.map((row) => {
+          const cells = row.map((bar) => {
+            const view = barView(bar);
+            const fonte = view.showModel ? "modelo" : "cifra";
+            const beats = beatsPerBar();
+            const placed = placeOnBeats(bar, view.events, beats);
+            const buttons = beatButtons(bar, placed, beats, view.measured, fonte);
+            const barNum = bar.bar ? `<span class="bar-num">${Number(bar.bar)}</span>` : "";
+            const ruleTitle = view.ruled && !view.showModel
+              ? ` title="${escapeHtml(`Ajustado por regra (${bar.regra || "ciclo"}). O modelo dizia: ${(bar.chords_modelo || []).map((item) => shownChord(item)).join(" ")}`)}"`
+              : "";
+            const ruledClass = view.ruled && !view.showModel ? " ruled" : "";
+            return `<div class="bar${ruledClass}${loopMark(bar)}" data-bar="${Number(bar.bar)}" data-start="${bar.start}" data-end="${bar.end}" data-beats="${beats}"${ruleTitle}>${barNum}<div class="beats" style="--beats:${beats}">${buttons}</div></div>`;
+          }).join("");
+          return `<div class="row">${cells}</div>`;
+        }).join("");
+        const kind = sectionKind(section.name);
+        return `<section class="part" data-kind="${kind}"><h3 title="${escapeHtml(theory)}"><span>${escapeHtml(section.name)}</span><time>${clock(section.start)}</time></h3><div class="grade-rows">${body}</div></section>`;
+      }).join("");
+      sheet.innerHTML = `
+        <div class="grade">${parts || "<p class='empty'>A medição não separou compassos.</p>"}</div>
+        <details class="analysis">
+          <summary>Leitura da análise</summary>
+          <div class="facts">${extraFacts.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+          <div class="notes">${notes.map((line) => `<div class="note">${escapeHtml(line)}</div>`).join("")}</div>
+          ${patternsHtml}
+          <div class="legend" aria-label="Como ler a cifra">
+            <span><i class="swatch-now"></i>em reprodução</span>
+            <span><i class="swatch-low"></i>baixa confiança</span>
+            <span><i class="swatch-ruled"></i>ajustado por regra</span>
+          </div>
+          <pre>${escapeHtml(chart.texto)}</pre>
+        </details>
+        <div class="actions">
+          <button class="again" id="again" type="button">Medir de novo</button>
+          <span class="status" id="status" role="status"></span>
+        </div>`;
+      map.querySelectorAll(".map-part").forEach((part) => {
+        part.addEventListener("click", () => startPlayback(Number(part.dataset.start)));
+      });
+      sheet.querySelectorAll(".chord-part").forEach((part) => {
+        part.addEventListener("click", () => onChordClick(part));
+      });
+      document.querySelector("#again").addEventListener("click", () => measure(chart.faixa));
+      paintHint();
+      paintPlay();
+      main.scrollTop = scroll;
+    }
+
+    function highlight() {
+      if (!audio) return;
+      const time = audio.currentTime;
+      let currentBar = null;
+      sheet.querySelectorAll(".bar").forEach((bar) => {
+        const inside = time >= Number(bar.dataset.start) && time < Number(bar.dataset.end);
+        bar.classList.toggle("now", inside);
+        if (inside) currentBar = bar;
+      });
+      sheet.querySelectorAll(".chord-part").forEach((part) => {
+        const chordOn = time >= Number(part.dataset.start) && time < Number(part.dataset.end);
+        const beatOn = time >= Number(part.dataset.beatStart) && time < Number(part.dataset.beatEnd);
+        part.classList.toggle("now-chord", chordOn);
+        part.classList.toggle("now-beat", beatOn);
+      });
+      document.querySelectorAll(".map-part").forEach((part) => {
+        const inside = time >= Number(part.dataset.start) && time < Number(part.dataset.end);
+        part.classList.toggle("now-section", inside);
+      });
+      if (currentBar && currentBar !== highlight.bar) {
+        highlight.bar = currentBar;
+        const box = currentBar.getBoundingClientRect();
+        const main = document.querySelector("main").getBoundingClientRect();
+        if (box.top < main.top + 150 || box.bottom > main.bottom - 24) {
+          currentBar.scrollIntoView({ block: "nearest" });
+        }
+      }
+    }
+
+    function follow() {
+      cancelAnimationFrame(frame);
+      const tick = () => {
+        highlight();
+        if (audio && !audio.paused) frame = requestAnimationFrame(tick);
+      };
+      tick();
+    }
+
+    function baseBpm() {
+      return Number(lastChart && lastChart.bpm) || 120;
+    }
+
+    function currentBpm() {
+      return bpmTarget || baseBpm();
+    }
+
+    function beatCount() {
+      const match = String(lastChart && lastChart.compasso || "").match(/(\d+)/);
+      const beats = match ? Number(match[1]) : 4;
+      return Math.min(12, Math.max(1, beats || 4));
+    }
+
+    function paintPlay() {
+      const button = document.querySelector("#play-toggle");
+      if (button) button.textContent = audio && !audio.paused ? "Pausar" : "Tocar";
+    }
+
+    function paintHint() {
+      const hint = document.querySelector("#tool-hint");
+      if (!hint) return;
+      if (!lastChart) hint.textContent = "Escolha uma faixa medida para usar o transporte.";
+      else if (editMode) hint.textContent = "Clique num acorde, digite o símbolo e aperte Enter.";
+      else if (loopMode && loopAnchor) hint.textContent = `Compasso ${loopAnchor.bar} marcado. Clique no último compasso do trecho.`;
+      else if (loopRange) hint.textContent = `Loop dos compassos ${loopRange.from}–${loopRange.to}.`;
+      else if (loopMode) hint.textContent = "Clique no primeiro compasso e depois no último. O áudio repete esse trecho.";
+      else hint.textContent = "Clique num acorde para ouvir dali.";
+    }
+
+    function paintReadouts() {
+      const bpm = document.querySelector("#bpm-readout");
+      const transpose = document.querySelector("#transpose-readout");
+      if (bpm) {
+        bpm.textContent = String(Math.round(currentBpm()));
+        bpm.setAttribute("aria-label", Math.round(currentBpm()) + " BPM");
+      }
+      if (transpose) {
+        const label = (semitones > 0 ? "+" : "") + semitones;
+        transpose.textContent = label;
+        transpose.setAttribute("aria-label", "Transposição " + label);
+      }
+    }
+
+    function setTransportEnabled(enabled) {
+      document.querySelectorAll("#toolbar button").forEach((button) => {
+        button.disabled = !enabled;
+      });
+    }
+
+    function syncTransport(chart) {
+      if (transportTrack !== chart.faixa) {
+        transportTrack = chart.faixa;
+        semitones = 0;
+        bpmTarget = null;
+        loopRange = null;
+        loopAnchor = null;
+        loopMode = false;
+        editMode = false;
+        document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false");
+        document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false");
+      }
+      setTransportEnabled(true);
+      paintReadouts();
+      applyTempo();
+      applyPitch();
+    }
+
+    function useTrackAudio(src) {
+      audio = document.querySelector("#player");
+      bindTransport();
+      if (audio.getAttribute("src") !== src) audio.src = src;
+      bindPlayerClock();
+      applyTempo();
+    }
+
+    function applyTempo() {
+      if (!audio) return;
+      audio.preservesPitch = true;
+      audio.playbackRate = currentBpm() / baseBpm();
+      paintReadouts();
+    }
+
+    function pitchAmount(steps) {
+      const ratio = Math.pow(2, steps / 12);
+      return steps >= 0 ? 2 * (ratio - 1) : -2 * (1 - ratio);
+    }
+
+    function ensureGraph() {
+      if (audioCtx) {
+        applyPitch();
+        return;
+      }
+      audioCtx = new AudioContext();
+      const media = audioCtx.createMediaElementSource(audio);
+      directGain = audioCtx.createGain();
+      pitchNode = new Jungle(audioCtx);
+      media.connect(directGain);
+      media.connect(pitchNode.input);
+      directGain.connect(audioCtx.destination);
+      pitchNode.output.connect(audioCtx.destination);
+      applyPitch();
+    }
+
+    function applyPitch() {
+      paintReadouts();
+      if (!pitchNode) return;
+      if (semitones === 0) {
+        directGain.gain.value = 1;
+        pitchNode.output.gain.value = 0;
+        return;
+      }
+      directGain.gain.value = 0;
+      pitchNode.output.gain.value = 1;
+      pitchNode.setPitchOffset(pitchAmount(semitones));
+    }
+
+    function pitchRoute() {
+      return {
+        semitones,
+        direct: directGain ? directGain.gain.value : null,
+        shifted: pitchNode ? pitchNode.output.gain.value : null,
+        rate: audio ? audio.playbackRate : null,
+      };
+    }
+
+    function scheduleClicks(beats, beatSec) {
+      const start = audioCtx.currentTime + 0.06;
+      for (let index = 0; index < beats; index += 1) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = index === 0 ? 880 : 660;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const when = start + index * beatSec;
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(0.12, when + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.08);
+        osc.start(when);
+        osc.stop(when + 0.09);
+      }
+    }
+
+    function wait(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function startPlayback(at) {
+      if (!audio || !lastChart) return;
+      const token = ++countToken;
+      ensureGraph();
+      if (audioCtx.state === "suspended") await audioCtx.resume();
+      let target = at;
+      if (loopMode && loopRange && (target == null || target < loopRange.start || target >= loopRange.end)) {
+        target = loopRange.start;
+      }
+      if (target != null && Number.isFinite(target)) audio.currentTime = target;
+      if (countInOn) {
+        audio.pause();
+        const beats = beatCount();
+        const beatSec = 60 / currentBpm();
+        scheduleClicks(beats, beatSec);
+        const readout = document.querySelector("#count-readout");
+        for (let beat = 1; beat <= beats; beat += 1) {
+          if (token !== countToken) return;
+          readout.textContent = String(beat);
+          readout.hidden = false;
+          await wait(beatSec * 1000);
+        }
+        if (token !== countToken) return;
+        readout.hidden = true;
+      }
+      skipCount = true;
+      await audio.play();
+      skipCount = false;
+    }
+
+    function onPlay() {
+      ensureGraph();
+      if (countInOn && !skipCount) {
+        const at = audio.currentTime;
+        audio.pause();
+        startPlayback(at);
+        return;
+      }
+      paintPlay();
+      follow();
+    }
+
+    function onTime() {
+      const clockEl = document.querySelector("#playhead");
+      if (clockEl && audio) {
+        const total = Number.isFinite(audio.duration) ? audio.duration : 0;
+        clockEl.textContent = clock(audio.currentTime) + " / " + clock(total);
+      }
+      if (!loopMode || !loopRange || !audio || audio.paused) return;
+      if (audio.currentTime >= loopRange.end - 0.03) audio.currentTime = loopRange.start;
+    }
+
+    function bindPlayerClock() {
+      if (!audio || audio.dataset.clock === "1") return;
+      audio.dataset.clock = "1";
+      audio.addEventListener("timeupdate", onTime);
+      audio.addEventListener("loadedmetadata", onTime);
+      onTime();
+    }
+
+    function bindTransport() {
+      if (audio.dataset.transport === "1") return;
+      audio.dataset.transport = "1";
+      audio.addEventListener("play", onPlay);
+      audio.addEventListener("pause", () => { highlight(); paintPlay(); });
+      audio.addEventListener("seeked", highlight);
+    }
+
+    function onPlayButton() {
+      if (!audio || !lastChart) return;
+      const readout = document.querySelector("#count-readout");
+      if (readout && !readout.hidden) {
+        countToken += 1;
+        readout.hidden = true;
+        return;
+      }
+      if (audio.paused) startPlayback(audio.currentTime);
+      else audio.pause();
+    }
+
+    function onChordClick(part) {
+      if (editMode) {
+        beginEdit(part);
+        return;
+      }
+      const bar = part.closest(".bar");
+      if (loopMode && bar) {
+        chooseLoop(bar);
+        return;
+      }
+      startPlayback(Number(part.dataset.beatStart || part.dataset.start));
+    }
+
+    function chooseLoop(bar) {
+      const point = { bar: Number(bar.dataset.bar), start: Number(bar.dataset.start), end: Number(bar.dataset.end) };
+      if (!loopAnchor) {
+        loopAnchor = point;
+        loopRange = null;
+        renderChart(lastChart);
+        return;
+      }
+      const first = loopAnchor.start <= point.start ? loopAnchor : point;
+      const second = first === loopAnchor ? point : loopAnchor;
+      loopRange = { start: first.start, end: second.end, from: first.bar, to: second.bar };
+      loopAnchor = null;
+      renderChart(lastChart);
+      startPlayback(loopRange.start);
+    }
+
+    function beginEdit(part) {
+      if (!part.dataset.chord) return;
+      const input = document.createElement("input");
+      input.className = "chord-edit";
+      input.value = transposeSymbol(part.dataset.chord, semitones);
+      input.setAttribute("aria-label", "Editar acorde");
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      part.replaceWith(input);
+      input.focus();
+      input.select();
+      let done = false;
+      const close = (save) => {
+        if (done) return;
+        done = true;
+        if (save) commitEdit(input, part);
+        else renderChart(lastChart);
+      };
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); close(true); }
+        if (event.key === "Escape") { event.preventDefault(); close(false); }
+      });
+      input.addEventListener("blur", () => close(true));
+    }
+
+    function writeLocal(barNumber, index, fonte, chord) {
+      const eventsKey = fonte === "modelo" ? "events_modelo" : "events";
+      const chordsKey = fonte === "modelo" ? "chords_modelo" : "chords";
+      lastChart.secoes.forEach((section) => {
+        section.bars.forEach((bar) => {
+          if (Number(bar.bar) !== Number(barNumber)) return;
+          if (bar[eventsKey] && bar[eventsKey][index]) bar[eventsKey][index].chord = chord;
+          if (Array.isArray(bar[chordsKey])) {
+            if (bar[eventsKey] && bar[eventsKey].length) bar[chordsKey] = bar[eventsKey].map((event) => event.chord);
+            else bar[chordsKey][index] = chord;
+          }
+          bar.origem = "edicao";
+        });
+      });
+    }
+
+    async function commitEdit(input, part) {
+      const typed = normalizeChord(input.value);
+      const original = part.dataset.chord;
+      if (!typed || chordIdentity(typed) === chordIdentity(transposeSymbol(original, semitones))) {
+        renderChart(lastChart);
+        return;
+      }
+      const back = transposeSymbol(typed, -semitones);
+      const stored = chordIdentity(back) === chordIdentity(original) ? original : back;
+      const barNumber = Number(part.dataset.bar);
+      const index = Number(part.dataset.index);
+      const fonte = part.dataset.fonte || "cifra";
+      writeLocal(barNumber, index, fonte, stored);
+      renderChart(lastChart);
+      const response = await fetch("/api/cifra", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ faixa: lastChart.faixa, compasso: barNumber, indice: index, acorde: stored, fonte }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        document.querySelector("#tool-hint").textContent = payload.erro || "Não foi possível salvar o acorde.";
+        return;
+      }
+      lastChart = payload;
+      renderChart(lastChart);
+    }
+
+    function stepBpm(delta) {
+      if (!lastChart) return;
+      const next = Math.max(40, Math.min(240, Math.round(currentBpm() + delta)));
+      bpmTarget = next === Math.round(baseBpm()) ? null : next;
+      applyTempo();
+    }
+
+    function stepTranspose(delta) {
+      if (!lastChart) return;
+      semitones = Math.max(-12, Math.min(12, semitones + delta));
+      ensureGraph();
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      applyPitch();
+      renderChart(lastChart);
+    }
+
+    // Pitch shift that keeps the tempo. The delay sweep is the Jungle
+    // algorithm (Chris Wilson / Google, BSD). semitone 0 bypasses it.
+    function createFadeBuffer(context, activeTime, fadeTime) {
+      const length1 = Math.floor(activeTime * context.sampleRate);
+      const length2 = Math.floor((activeTime - 2 * fadeTime) * context.sampleRate);
+      const length = length1 + length2;
+      const buffer = context.createBuffer(1, length, context.sampleRate);
+      const data = buffer.getChannelData(0);
+      const fadeLength = fadeTime * context.sampleRate;
+      for (let i = 0; i < length1; i += 1) {
+        if (i < fadeLength) data[i] = Math.sqrt(i / fadeLength);
+        else if (i >= length1 - fadeLength) data[i] = Math.sqrt(1 - (i - (length1 - fadeLength)) / fadeLength);
+        else data[i] = 1;
+      }
+      return buffer;
+    }
+
+    function createDelayTimeBuffer(context, activeTime, fadeTime, shiftUp) {
+      const length1 = Math.floor(activeTime * context.sampleRate);
+      const length2 = Math.floor((activeTime - 2 * fadeTime) * context.sampleRate);
+      const length = length1 + length2;
+      const buffer = context.createBuffer(1, length, context.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length1; i += 1) data[i] = shiftUp ? (length1 - i) / length : i / length1;
+      return buffer;
+    }
+
+    function Jungle(context) {
+      const bufferTime = 0.1;
+      const fadeTime = 0.05;
+      const input = context.createGain();
+      const output = context.createGain();
+      this.input = input;
+      this.output = output;
+      const modulators = [0, 1, 2, 3].map(() => context.createBufferSource());
+      const down = createDelayTimeBuffer(context, bufferTime, fadeTime, false);
+      const up = createDelayTimeBuffer(context, bufferTime, fadeTime, true);
+      modulators[0].buffer = modulators[1].buffer = down;
+      modulators[2].buffer = modulators[3].buffer = up;
+      modulators.forEach((mod) => { mod.loop = true; });
+      const gates = modulators.map(() => context.createGain());
+      gates[2].gain.value = 0;
+      gates[3].gain.value = 0;
+      modulators.forEach((mod, index) => mod.connect(gates[index]));
+      const modGain1 = context.createGain();
+      const modGain2 = context.createGain();
+      const delay1 = context.createDelay();
+      const delay2 = context.createDelay();
+      gates[0].connect(modGain1);
+      gates[1].connect(modGain2);
+      gates[2].connect(modGain1);
+      gates[3].connect(modGain2);
+      modGain1.connect(delay1.delayTime);
+      modGain2.connect(delay2.delayTime);
+      const fades = [context.createBufferSource(), context.createBufferSource()];
+      const fadeBuffer = createFadeBuffer(context, bufferTime, fadeTime);
+      fades.forEach((fade) => { fade.buffer = fadeBuffer; fade.loop = true; });
+      const mix1 = context.createGain();
+      const mix2 = context.createGain();
+      mix1.gain.value = 0;
+      mix2.gain.value = 0;
+      fades[0].connect(mix1.gain);
+      fades[1].connect(mix2.gain);
+      input.connect(delay1);
+      input.connect(delay2);
+      delay1.connect(mix1);
+      delay2.connect(mix2);
+      mix1.connect(output);
+      mix2.connect(output);
+      const t = context.currentTime + 0.05;
+      const t2 = t + bufferTime - fadeTime;
+      modulators.forEach((mod) => mod.start(mod === modulators[1] || mod === modulators[3] ? t2 : t));
+      fades[0].start(t);
+      fades[1].start(t2);
+      this.setPitchOffset = (amount) => {
+        const upShift = amount > 0;
+        gates[0].gain.value = upShift ? 0 : 1;
+        gates[1].gain.value = upShift ? 0 : 1;
+        gates[2].gain.value = upShift ? 1 : 0;
+        gates[3].gain.value = upShift ? 1 : 0;
+        const delay = 0.1 * Math.abs(amount);
+        modGain1.gain.setTargetAtTime(0.5 * delay, context.currentTime, 0.01);
+        modGain2.gain.setTargetAtTime(0.5 * delay, context.currentTime, 0.01);
+      };
+    }
+
+
+    async function openTrack(faixa) {
+      current = faixa;
+      document.querySelectorAll(".songs button").forEach((button) => {
+        if (button.dataset.faixa === faixa) button.setAttribute("aria-current", "true");
+        else button.removeAttribute("aria-current");
+      });
+      sheet.innerHTML = "<p class='empty'>Carregando a cifra…</p>";
+      const response = await fetch("/api/cifra?faixa=" + encodeURIComponent(faixa));
+      const payload = await response.json();
+      if (!response.ok) {
+        const title = faixa.split("/").pop().replace(/\.[^.]+$/, "");
+        document.querySelector("#song-title").textContent = title;
+        document.querySelector("#song-meta").innerHTML = "";
+        document.querySelector("#song-map").hidden = true;
+        if (audio) audio.pause();
+        setTransportEnabled(false);
+        sheet.innerHTML = `<h2>${escapeHtml(title)}</h2><p class="empty">${escapeHtml(payload.erro)}</p><p class="hint">Esta faixa ainda não tem cifra. Meça agora ou escolha outra na lista.</p><div class="actions"><button class="again" id="again" type="button">Medir agora</button><span class="status" id="status" role="status"></span></div>`;
+        document.querySelector("#again").addEventListener("click", () => measure(faixa));
+        paintHint();
+        return;
+      }
+      highlight.bar = null;
+      renderChart(payload);
+      document.querySelector("main").scrollTop = 0;
+    }
+
+    async function measure(faixa) {
+      const button = document.querySelector("#again");
+      const status = document.querySelector("#status");
+      button.disabled = true;
+      status.textContent = "Medindo pulsos, acordes e estrutura. A primeira análise estrutural pode demorar na CPU; as próximas reutilizam o cache.";
+      const response = await fetch("/api/analisar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ faixa }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        button.disabled = false;
+        status.textContent = payload.erro || "A medição falhou.";
+        throw new Error(status.textContent);
+      }
+      await loadSongs(faixa);
+    }
+
+    async function loadSongs(prefer) {
+      const response = await fetch("/api/musicas");
+      const payload = await response.json();
+      const songs = payload.musicas || [];
+      const ready = songs.filter((song) => song.medida);
+      const pending = songs.filter((song) => !song.medida);
+      const preferPending = pending.some((song) => song.faixa === prefer);
+      songsEl.innerHTML = [
+        ready.map(songButton).join(""),
+        pending.length
+          ? `<details class="pending-songs"${preferPending ? " open" : ""}><summary>Ainda sem cifra (${pending.length})</summary><div class="songs-stack">${pending.map(songButton).join("")}</div></details>`
+          : "",
+      ].join("") || "<p>Nenhum áudio na pasta do projeto.</p>";
+      songsEl.querySelectorAll("button").forEach((button) => {
+        button.addEventListener("click", () => openTrack(button.dataset.faixa));
+      });
+      applySongFilter();
+      const chosen = songs.find((song) => song.faixa === prefer) || ready[0] || songs[0];
+      if (chosen) await openTrack(chosen.faixa);
+      else sheet.innerHTML = "<p class='empty'>Nenhum áudio na pasta do projeto.</p>";
+    }
+
+    function applySongFilter() {
+      const query = (document.querySelector("#song-filter").value || "").trim().toLowerCase();
+      songsEl.querySelectorAll("button[data-faixa]").forEach((button) => {
+        button.hidden = Boolean(query) && !button.textContent.toLowerCase().includes(query);
+      });
+      const pending = songsEl.querySelector(".pending-songs");
+      if (pending && query) {
+        const visible = pending.querySelectorAll("button[data-faixa]:not([hidden])").length;
+        pending.hidden = visible === 0;
+        if (visible) pending.open = true;
+      } else if (pending) {
+        pending.hidden = false;
+      }
+    }
+
+    async function importAndAnalyze(endpoint, options, busyText) {
+      const importStatus = document.querySelector("#import-status");
+      const buttons = document.querySelectorAll(".importer button");
+      buttons.forEach((button) => {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+      });
+      importStatus.textContent = busyText;
+      try {
+        const response = await fetch(endpoint, options);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.erro || "Não foi possível importar o áudio.");
+        importStatus.textContent = "Áudio recebido. Iniciando a análise…";
+        await loadSongs(payload.faixa);
+        await measure(payload.faixa);
+        importStatus.textContent = "Análise concluída.";
+      } catch (error) {
+        importStatus.textContent = error.message;
+      } finally {
+        buttons.forEach((button) => button.removeAttribute("aria-busy"));
+        document.querySelector("#upload").disabled = !document.querySelector("#audio-file").files.length;
+        const youtube = document.querySelector("#youtube");
+        if (youtube) youtube.disabled = false;
+      }
+    }
+
+    document.querySelector("#audio-file").addEventListener("change", () => {
+      const input = document.querySelector("#audio-file");
+      const file = input.files[0];
+      document.querySelector("#file-name").textContent = file ? file.name : "Nenhum arquivo escolhido";
+      document.querySelector("#upload").disabled = !file;
+    });
+
+    document.querySelector("#song-filter").addEventListener("input", applySongFilter);
+
+    document.querySelector("#upload").addEventListener("click", () => {
+      const input = document.querySelector("#audio-file");
+      if (!input.files.length) {
+        document.querySelector("#import-status").textContent = "Escolha um arquivo primeiro.";
+        return;
+      }
+      const file = input.files[0];
+      importAndAnalyze(
+        "/api/upload?nome=" + encodeURIComponent(file.name),
+        { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file },
+        "Enviando o áudio…",
+      );
+    });
+
+    document.querySelector("#youtube").addEventListener("click", () => {
+      const input = document.querySelector("#youtube-url");
+      if (!input.value.trim()) {
+        document.querySelector("#import-status").textContent = "Cole um link do YouTube primeiro.";
+        return;
+      }
+      importAndAnalyze("/api/youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: input.value.trim() }),
+      }, "Baixando o áudio do YouTube…");
+    });
+
+    fetch("/api/config")
+      .then((response) => response.json())
+      .then((config) => { document.querySelector("#youtube-box").hidden = !config.youtube; })
+      .catch(() => {});
+    document.querySelector("#play-toggle").addEventListener("click", onPlayButton);
+    document.querySelector("#count-in").addEventListener("click", () => {
+      countInOn = !countInOn;
+      document.querySelector("#count-in").setAttribute("aria-pressed", String(countInOn));
+    });
+    document.querySelector("#bpm-down").addEventListener("click", () => stepBpm(-1));
+    document.querySelector("#bpm-up").addEventListener("click", () => stepBpm(1));
+    document.querySelector("#bpm-readout").addEventListener("click", () => { bpmTarget = null; applyTempo(); });
+    document.querySelector("#transpose-down").addEventListener("click", () => stepTranspose(-1));
+    document.querySelector("#transpose-up").addEventListener("click", () => stepTranspose(1));
+    document.querySelector("#transpose-readout").addEventListener("click", () => { semitones = 0; applyPitch(); if (lastChart) renderChart(lastChart); });
+    document.querySelector("#loop-toggle").addEventListener("click", () => {
+      loopMode = !loopMode;
+      if (!loopMode) loopAnchor = null;
+      document.querySelector("#loop-toggle").setAttribute("aria-pressed", String(loopMode));
+      if (loopMode) { editMode = false; document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false"); }
+      if (lastChart) renderChart(lastChart); else paintHint();
+    });
+    document.querySelector("#edit-toggle").addEventListener("click", () => {
+      editMode = !editMode;
+      if (editMode) { loopMode = false; loopAnchor = null; document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false"); }
+      document.querySelector("#edit-toggle").setAttribute("aria-pressed", String(editMode));
+      if (lastChart) renderChart(lastChart); else paintHint();
+    });
+    document.querySelector("#toggle-notation").addEventListener("click", () => {
+      chordifyNotation = !chordifyNotation;
+      document.querySelector("#toggle-notation").setAttribute("aria-pressed", String(chordifyNotation));
+      if (lastChart) renderChart(lastChart);
+    });
+    document.querySelector("#toggle-model").addEventListener("click", () => {
+      modelOnly = !modelOnly;
+      document.querySelector("#toggle-model").setAttribute("aria-pressed", String(modelOnly));
+      if (lastChart) renderChart(lastChart);
+    });
+    loadSongs();
+  </script>
+</body>
+</html>

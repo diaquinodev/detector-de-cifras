@@ -1,6 +1,8 @@
 # Segredos e dados reais
 .env
 dados/
+[Gg]uitar[Ss]et/
+*.jams
 
 # Python
 .venv/

@@ -1,0 +1,8 @@
+[project]
+name = "detector-de-cifras"
+version = "0.1.0"
+description = "Detector de acordes em Python: lê um mp3 e devolve a cifra por compasso, com andamento, fórmula de compasso e seções."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["cifras/tests"]

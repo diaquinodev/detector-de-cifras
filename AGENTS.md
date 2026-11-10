@@ -43,3 +43,17 @@ python -m pytest
 
 - Dados sempre fictícios no repositório; dados reais ficam em `dados/` (ignorada pelo Git).
 - Segredos só no `.env` (ignorado); documente cada chave no `.env.example`.
+
+## Este projeto
+
+- Código em `cifras/` (módulos soltos; os testes em `cifras/tests/` põem a pasta no
+  `sys.path`). `cifras/analyze.py` é a entrada; `cifras/servir.py` é a página local.
+- **Nunca versione:** áudio (`uploads/`, `*.mp3`), pesos (`*.pt`, `*.ckpt`), `cifras/saida/`
+  nem o GuitarSet (`dados/`, qualquer pasta `guitarset/` e `*.jams`). O `.gitignore` barra
+  esses caminhos; confira `git status --ignored` antes do commit.
+- **Laboratório de origem:** `D:\PROJETOS\moises-rea`, só local. Tem o app do Moises aberto
+  para estudo e a ferramenta `rea`; nada de lá entra aqui além do que já foi importado.
+  Copiar modelo, pesos ou código do Moises ou do Chordify está fora do escopo.
+- **Trava de regressão:** a introdução já lida (Fmaj7, G/F, Em7, Am7 em Fá maior, ~74 BPM,
+  4/4) não pode piorar; ver `docs/pesquisa/refinar-deteccao-de-acordes.md`.
+- Plano: `brain/plans/detector-de-cifras/` no QG.
