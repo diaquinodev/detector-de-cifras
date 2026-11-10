@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import os
 import sys
+import tempfile
 import urllib.request
 from pathlib import Path
 
@@ -39,6 +40,7 @@ BTC_DESTINO = VENDOR / "btc-chord" / "btc_model_large_voca_safe.pt"
 BTC_CONTEUDO_SHA256 = "e84c4886a9b3731ddde2457c78596ab45a670f2343dc2e87f06a98f3f6659fb4"
 
 BLOCO = 1 << 20
+TIMEOUT_S = 60  # sem resposta do servidor por esse tempo, desiste em vez de travar
 
 
 def sha256_of(path: Path) -> str:
@@ -49,6 +51,16 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _temporario(destino: Path) -> Path:
+    """Arquivo exclusivo ao lado do destino: duas execuções ao mesmo tempo não se pisam."""
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    handle, nome = tempfile.mkstemp(
+        dir=destino.parent, prefix=destino.name + ".", suffix=".parcial"
+    )
+    os.close(handle)
+    return Path(nome)
+
+
 def download(url: str, destino: Path, sha256: str) -> bool:
     """Baixa ``url`` para ``destino`` e confere o SHA-256. Devolve False se já estava certo.
 
@@ -57,10 +69,12 @@ def download(url: str, destino: Path, sha256: str) -> bool:
     """
     if destino.is_file() and sha256_of(destino) == sha256:
         return False
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    parcial = destino.with_name(destino.name + ".parcial")
+    parcial = _temporario(destino)
     try:
-        with urllib.request.urlopen(url) as resposta, parcial.open("wb") as saida:
+        with (
+            urllib.request.urlopen(url, timeout=TIMEOUT_S) as resposta,
+            parcial.open("wb") as saida,
+        ):
             while block := resposta.read(BLOCO):
                 saida.write(block)
         obtido = sha256_of(parcial)
@@ -103,8 +117,11 @@ def content_digest(checkpoint: dict) -> str:
     return digest.hexdigest()
 
 
-def convert_btc(original: Path, destino: Path) -> str:
-    """Grava a versão "safe" do checkpoint do BTC e devolve o resumo do conteúdo."""
+def convert_btc(original: Path, destino: Path, esperado: str | None = None) -> str:
+    """Grava a versão "safe" do checkpoint do BTC e devolve o resumo do conteúdo.
+
+    Com ``esperado``, o arquivo só ganha o nome final se o conteúdo tiver esse resumo.
+    """
     import torch
 
     with torch.serialization.safe_globals(_numpy_permitidos()):
@@ -114,12 +131,16 @@ def convert_btc(original: Path, destino: Path) -> str:
         "mean": torch.as_tensor(checkpoint["mean"]),
         "std": torch.as_tensor(checkpoint["std"]),
     }
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    parcial = destino.with_name(destino.name + ".parcial")
+    parcial = _temporario(destino)
     try:
         torch.save(seguro, parcial)
         # Prova que o arquivo gravado abre no modo seguro puro, sem nenhuma liberação.
         resumo = content_digest(torch.load(parcial, map_location="cpu", weights_only=True))
+        if esperado is not None and resumo != esperado:
+            raise SystemExit(
+                f"{destino.name}: o conteúdo convertido ({resumo}) não é o esperado ({esperado}). "
+                "O arquivo foi descartado."
+            )
         os.replace(parcial, destino)
     finally:
         parcial.unlink(missing_ok=True)
@@ -147,17 +168,11 @@ def prepare_btc(
     """Baixa e converte o BTC. Devolve False se o destino já estava certo."""
     if btc_ok(destino, esperado):
         return False
-    original = destino.with_name("btc_model_large_voca.original")
-    try:
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=destino.parent, prefix=".btc-original-") as pasta:
+        original = Path(pasta) / "btc_model_large_voca.pt"
         download(url, original, sha256)
-        resumo = convert_btc(original, destino)
-    finally:
-        original.unlink(missing_ok=True)
-    if resumo != esperado:
-        destino.unlink(missing_ok=True)
-        raise SystemExit(
-            f"{destino.name}: o conteúdo convertido ({resumo}) não é o esperado ({esperado})."
-        )
+        convert_btc(original, destino, esperado)
     return True
 
 

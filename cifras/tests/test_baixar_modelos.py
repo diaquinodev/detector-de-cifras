@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -53,6 +54,36 @@ class DownloadTest(unittest.TestCase):
             baixar_modelos.download(self.origem.as_uri(), self.destino, "0" * 64)
         self.assertEqual(list(self.destino.parent.iterdir()), [])
 
+    def test_leaves_nothing_behind_when_the_connection_breaks_mid_download(self):
+        class Cortada:
+            def __init__(self):
+                self.blocos = [b"pesos "]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, _size):
+                if self.blocos:
+                    return self.blocos.pop()
+                raise ConnectionResetError("conexão cortada")
+
+        with mock.patch("urllib.request.urlopen", return_value=Cortada()) as aberto:
+            with self.assertRaises(ConnectionResetError):
+                baixar_modelos.download("https://exemplo.invalid/x", self.destino, self.sha)
+        self.assertEqual(aberto.call_args.kwargs["timeout"], baixar_modelos.TIMEOUT_S)
+        self.assertEqual(list(self.destino.parent.iterdir()), [])
+
+    def test_two_partial_files_never_share_a_name(self):
+        um, outro = (
+            baixar_modelos._temporario(self.destino),
+            baixar_modelos._temporario(self.destino),
+        )
+        self.assertNotEqual(um, outro)
+        self.assertEqual(um.parent, self.destino.parent)
+
 
 @unittest.skipUnless(TEM_TORCH, SEM_TORCH)
 class ConvertBtcTest(unittest.TestCase):
@@ -80,13 +111,31 @@ class ConvertBtcTest(unittest.TestCase):
         self.assertEqual(seguro["std"].dtype, self.torch.float64)
         self.assertEqual(resumo, baixar_modelos.content_digest(seguro))
 
+    def test_accepts_a_float32_numpy_mean(self):
+        import numpy as np
+
+        self.torch.save(
+            {"model": self.pesos, "mean": np.float32(1.5), "std": np.float64(0.25)}, self.original
+        )
+        baixar_modelos.convert_btc(self.original, self.destino)
+        seguro = self.torch.load(self.destino, map_location="cpu", weights_only=True)
+        self.assertEqual(seguro["mean"].dtype, self.torch.float32)
+        self.assertEqual(float(seguro["mean"]), 1.5)
+
+    def test_unexpected_content_never_gets_the_final_name(self):
+        with self.assertRaises(SystemExit):
+            baixar_modelos.convert_btc(self.original, self.destino, "0" * 64)
+        self.assertEqual(list(self.destino.parent.iterdir()), [])
+
     def test_the_digest_changes_when_one_weight_changes(self):
         antes = baixar_modelos.convert_btc(self.original, self.destino)
         self.pesos["camada.peso"][0, 0] = 9.0
         self.torch.save({"model": self.pesos, "mean": 1.5, "std": 0.25}, self.original)
         self.assertNotEqual(antes, baixar_modelos.convert_btc(self.original, self.destino))
 
-    def test_refuses_a_checkpoint_that_would_run_code(self):
+    def test_refuses_a_global_outside_the_allowlist_and_runs_nothing(self):
+        # Prova que um global fora da lista (aqui os.mkdir) é recusado e não roda. Não prova
+        # que a lista em si é inexplorável: ela tem só o escalar do numpy e dtypes float.
         alvo = self.tmp / "codigo-executado"
         self.torch.save({"model": self.pesos, "mean": _Explosivo(alvo), "std": 0.25}, self.original)
         with self.assertRaises(Exception):  # noqa: B017
