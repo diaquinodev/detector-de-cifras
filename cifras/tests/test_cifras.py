@@ -355,7 +355,10 @@ class SavedChartsTest(unittest.TestCase):
     """A grade da página desenha ``events``; o texto escreve ``chords``. Os dois têm de bater."""
 
     def test_events_match_chords(self):
-        for path in sorted((CIFRAS / "saida").glob("*.json")):
+        # A fixture fictícia garante que o teste confere algo no CI, onde saida/ não existe.
+        fixtures = sorted((CIFRAS / "tests" / "fixtures").glob("*.json"))
+        self.assertTrue(fixtures, "sem fixture em tests/fixtures/")
+        for path in fixtures + sorted((CIFRAS / "saida").glob("*.json")):
             data = json.loads(path.read_text(encoding="utf-8"))
             for bar in data.get("compassos") or []:
                 events = bar.get("events") or []
