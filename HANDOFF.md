@@ -4,31 +4,28 @@
 Claude Code
 
 ## Branch
-fase/2-pesos-reproduziveis
+fix/readme-e-handoff
 
 ## Trilha
-grande
+rápida
 
 ## Plano/fase
-QG: brain/plans/detector-de-cifras/phase-2-pesos-reproduziveis.md
+QG: brain/plans/detector-de-cifras/overview.md (as três fases estão concluídas)
 
 ## Feito
-- fases 0 e 1 integradas (PRs #1 e #2)
-- `scripts/baixar_modelos.py`: baixa Beat This! e BTC com SHA-256 fixo e grava o BTC "safe" sem usar o modo inseguro do PyTorch; 12 testes sem rede em `cifras/tests/test_baixar_modelos.py`
-- prova em cópia limpa: download real, segunda execução sem baixar, `analyze.py` em "My Girl" usando os dois modelos
-- código da fase 0 e código atual geram cifra e JSON idênticos para "My Girl" (o ruff não mudou o resultado)
-- licenças com fonte: Beat This! (README do projeto: código e pesos MIT) e BTC (repositório original MIT)
-- CI instala torch de CPU para rodar os testes da conversão
-- PR #3 aberto; 1ª revisão do Codex (Revise) tratada: o BTC só ganha o nome final depois de conferido o conteúdo; temporários com nome exclusivo; timeout de 60 s no download; testes de conexão cortada, float32 e conteúdo inesperado
+- fase 0 (PR #1): código e pesquisa importados do laboratório, sem áudio, pesos nem dados
+- fase 1 (PR #2): estilo com ruff e ruff no CI
+- fase 2 (PR #3): `scripts/baixar_modelos.py` baixa e prepara os pesos do Beat This! e do BTC
+- README: sem torch são 7 os testes pulados (o texto dizia 5)
 
 ## Falta
-- nova revisão do Codex no commit atual do PR #3
+- nada neste plano
 
 ## Próximo comando
-revisão cruzada do PR #3 pelo Codex; com Accept, marcar Ready for review
+ideia nova (ex.: violão lido em mi menor em vez de lá menor; troca de acorde no tempo 3): fazer o brainstorm no QG antes de planejar
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-10 21:00
+2026-11-10 21:40
