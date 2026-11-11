@@ -4,31 +4,33 @@
 Claude Code
 
 ## Branch
-fase/3-frases
+fase/5-voto-entre-voltas
 
 ## Trilha
 grande
 
 ## Plano/fase
-QG: brain/plans/detector-de-cifras-refino/phase-3-frases.md (tarefa 107). A ordem mudou a pedido do usuário em 11/11: fases 3, 4 e 5 (repetição) antes das fases 1 e 2 (acordes)
+QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tarefa 109). Rumo confirmado pelo usuário em 11/11: (1) uma cifra por volta usando os ciclos lidos na cifra; (2) editor na página cujas correções viram gabarito
 
 ## Feito
 - plano anterior (organização) concluído: PRs #1 a #4
-- fase 0 do refino (régua de erros) integrada: PR #5
-- fase 3: `cifras/phrases.py` agrupa os compassos em frases de 4 pelo áudio (novidade entre compassos), com exceções nomeadas (anacruse, compasso extra, frase curta, final incompleto, silêncio); 15 testes sintéticos
-- revisão do Codex no commit d44ad7d (Revise, 2 achados) tratada: silêncio no fim fica à parte e silêncio no meio é pausa dentro da frase; compasso solto só se junta à frase anterior quando a música não muda ali; segunda rodada (95b0079, 1 achado): a novidade passa a olhar só o trecho com som
-- fase 3: `analyze.py` grava a lista `frases` na cifra salva; nenhuma seção nem acorde muda ainda
-- fase 3 nas 7 músicas locais: 154 frases, 13 exceções; em "Flake" a exceção do compasso 17 corresponde a meio ciclo a mais antes da parte seguinte
+- fase 0 (régua de erros) integrada: PR #5; fase 3 (frases) integrada: PR #6
+- fase 4 (letras só pelo áudio) parada: a branch `fase/4-letras` guarda `letters.py` e as duas medições, sem PR; o croma da mixagem não separa trechos iguais de diferentes em música real
+- fase 5: `cycles._settle_laps` no lugar de `_harmonize_outliers`. As voltas de um ciclo votam a cifra de cada posição; a volta antes de a voz entrar vale em dobro (`QUIET_LAP_WEIGHT`); um acorde de passagem lido em poucas voltas cede para a cifra do ciclo; a diferença que fica ganha `variacao_do_ciclo` no compasso
+- fase 5: a régua (`diagnostico.form_invariants`) conta à parte a volta cujas diferenças estão todas marcadas (`voltas_com_variacao_marcada`)
+- fase 5: 153 testes verdes no Windows; em "Flake" as cinco voltas do verso saem `Dm | F | Bb | F` e só o final (`C`) fica diferente
 
 ## Falta
-- nada nesta fase além da revisão cruzada e do merge
-- ninguém conferiu de ouvido se as exceções das outras músicas estão certas
+- medir as invariantes nas 7 músicas locais, antes e depois (as cifras antigas estão guardadas fora do repositório)
+- medir o GuitarSet e conferir que não caiu
+- decidir `repeats.lock_repeated_phrases`: o plano manda apagar, mas ela compara o áudio e não a cifra; só sai se a medição mostrar que não faz falta
+- PR draft, revisão cruzada pelo Codex
 
 ## Próximo comando
-revisão cruzada do PR da fase 3 por um agente diferente do autor (Codex); depois do merge, fase 4 (QG: brain/plans/detector-de-cifras-refino/phase-4-letras.md), branch fase/4-letras a partir da main
+python cifras/diagnostico.py --help, rodar as invariantes sobre cifras/saida e comparar com a linha de base da fase 0 (24 de 81 seções fora de frase, 80 de 111 voltas diferentes)
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-11 14:38
+2026-11-11 19:12

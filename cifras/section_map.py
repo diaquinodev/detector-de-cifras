@@ -306,6 +306,7 @@ def map_sections_with_theory(
         mode,
         harmonize_outliers=True,
         modulation=modulation,
+        quiet_until=vocal_onset_bar,
     )
 
     has_vocal_profile = vocal_presence is not None and vocal_presence.size == n

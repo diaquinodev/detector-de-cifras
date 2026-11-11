@@ -12,6 +12,7 @@ from constants import (
     OUTLIER_CONFIDENCE,
     OUTLIER_SIM,
     PICKUP_SIM_DELTA,
+    QUIET_LAP_WEIGHT,
     STRONG_SLOT_SIM,
 )
 from spelling import (
@@ -25,14 +26,20 @@ from spelling import (
 )
 
 
-def canonical_chord_choice(bars_at_slot: list[dict], sigs_at_slot: list[dict]) -> list[str]:
-    """Escolhe o acorde representativo de uma posição dentro de um ciclo repetido."""
+def canonical_chord_choice(
+    bars_at_slot: list[dict], sigs_at_slot: list[dict], weights: list[float] | None = None
+) -> list[str]:
+    """Escolhe o acorde representativo de uma posição dentro de um ciclo repetido.
+
+    Cada volta vota com a confiança do modelo. ``weights`` multiplica o voto de cada
+    volta: a volta sem voz vale mais, porque ali a harmonia soa limpa.
+    """
     root_weights: Counter[int] = Counter()
     chord_weights: Counter[tuple[str, ...]] = Counter()
-    for bar, sig in zip(bars_at_slot, sigs_at_slot, strict=False):
+    for index, (bar, sig) in enumerate(zip(bars_at_slot, sigs_at_slot, strict=False)):
         if sig["root"] is None:
             continue
-        weight = max(0.15, float(bar.get("confidence", 0.6)))
+        weight = _vote_weight(bar, weights[index] if weights else 1.0)
         root_weights[sig["root"]] += weight
         chord_weights[tuple(bar.get("chords") or ["N"])] += weight
     if not root_weights:
@@ -47,6 +54,28 @@ def canonical_chord_choice(bars_at_slot: list[dict], sigs_at_slot: list[dict]) -
         return list(chord_weights.most_common(1)[0][0])
     matching.sort(key=lambda item: (item[1], -len(item[0])), reverse=True)
     return list(matching[0][0])
+
+
+def _vote_weight(bar: dict, factor: float = 1.0) -> float:
+    return max(0.15, float(bar.get("confidence", 0.6))) * factor
+
+
+def _lap_weights(instances: list[dict], slot: int, quiet_until: int) -> list[float]:
+    """Peso de cada volta numa posição: maior onde a voz ainda não entrou."""
+    return [
+        QUIET_LAP_WEIGHT if inst["start_bar"] + slot < quiet_until else 1.0 for inst in instances
+    ]
+
+
+def _has_majority(target: list[str], bars_at_slot: list[dict], weights: list[float]) -> bool:
+    """A cifra do ciclo soma mais voto do que todas as outras leituras juntas."""
+    agree = against = 0.0
+    for bar, factor in zip(bars_at_slot, weights, strict=True):
+        if list(bar.get("chords") or ["N"]) == target:
+            agree += _vote_weight(bar, factor)
+        else:
+            against += _vote_weight(bar, factor)
+    return agree > against
 
 
 def _window_repeats_score(sigs: list[dict], start: int, period: int = 4) -> tuple[int, float]:
@@ -240,7 +269,29 @@ def _group_families(blocks: list[dict], sigs: list[dict]) -> list[dict]:
     return families
 
 
-def _harmonize_outliers(
+def _is_passing_reading(bar: dict, sig: dict, target: list[str]) -> bool:
+    """O compasso traz o acorde do ciclo e mais um de passagem (``F C`` onde o ciclo diz ``F``)."""
+    if len(target) != 1 or len(bar.get("chords") or []) < 2:
+        return False
+    return parse_chord_symbol(target[0])["root"] in sig["roots"]
+
+
+def _is_parallel_blink(bar: dict, target: list[str]) -> bool:
+    """Dois acordes na fundamental do ciclo, o segundo menor, onde o ciclo diz maior."""
+    if len(bar.get("chords") or []) != 2 or len(target) != 1:
+        return False
+    first = parse_chord_symbol(bar["chords"][0])
+    second = parse_chord_symbol(bar["chords"][1])
+    wanted = parse_chord_symbol(target[0])
+    return (
+        first["root"] == wanted["root"]
+        and second["root"] == wanted["root"]
+        and second["family"] == "min"
+        and wanted["family"] == "maj"
+    )
+
+
+def _settle_laps(
     instances: list[dict],
     period: int,
     canonical_chords: list[list[str]],
@@ -250,9 +301,26 @@ def _harmonize_outliers(
     tonic: int,
     mod_tonic: int,
     mode: str,
+    quiet_until: int,
 ) -> None:
+    """Escreve a cifra do ciclo nas voltas que saíram diferentes; o que fica, fica marcado.
+
+    Só mexe numa volta que bate com o ciclo em todas as posições menos uma. Um compasso
+    troca de cifra em três casos: a leitura dele discorda do ciclo e o modelo tinha pouca
+    confiança; o ciclo é maior e o compasso pisca para o menor; ou o compasso traz o acorde
+    do ciclo com outro de passagem e a maioria das voltas (a volta sem voz vale mais) não
+    tem essa passagem. Diferença que sobra ganha ``variacao_do_ciclo``.
+    """
     if len(instances) < 2 or period < 4:
         return
+    majority = [
+        _has_majority(
+            canonical_chords[slot],
+            [bars[inst["start_bar"] + slot] for inst in instances],
+            _lap_weights(instances, slot, quiet_until),
+        )
+        for slot in range(period)
+    ]
     for inst in instances:
         b0 = inst["start_bar"]
         inst_tonic = mod_tonic if b0 >= mod_bar else tonic
@@ -264,26 +332,22 @@ def _harmonize_outliers(
             for s in range(period)
         ]
         strong_slots = sum(1 for sim in slot_sims if sim >= STRONG_SLOT_SIM)
-        if strong_slots >= period - 1:
-            for s in range(period):
-                bar = bars[b0 + s]
-                target = canonical_chords[s]
-                if (
-                    slot_sims[s] < OUTLIER_SIM
-                    and float(bar.get("confidence", 0.0)) < OUTLIER_CONFIDENCE
-                ):
-                    override_bar(bar, target, "consenso do ciclo")
-                elif len(bar.get("chords") or []) == 2 and len(target) == 1:
-                    c0 = parse_chord_symbol(bar["chords"][0])
-                    c1 = parse_chord_symbol(bar["chords"][1])
-                    t0 = parse_chord_symbol(target[0])
-                    if (
-                        c0["root"] == t0["root"]
-                        and c1["root"] == t0["root"]
-                        and c1["family"] == "min"
-                        and t0["family"] == "maj"
-                    ):
-                        override_bar(bar, target, "consenso do ciclo")
+        if strong_slots < period - 1:
+            continue
+        for s in range(period):
+            bar = bars[b0 + s]
+            target = canonical_chords[s]
+            if list(bar.get("chords") or ["N"]) == target:
+                continue
+            unsure = (
+                slot_sims[s] < OUTLIER_SIM
+                and float(bar.get("confidence", 0.0)) < OUTLIER_CONFIDENCE
+            )
+            passing = majority[s] and _is_passing_reading(bar, sigs[b0 + s], target)
+            if unsure or passing or _is_parallel_blink(bar, target):
+                override_bar(bar, target, "consenso do ciclo")
+            else:
+                bar["variacao_do_ciclo"] = " ".join(target)
 
 
 def _apply_secondary_dominant(
@@ -349,6 +413,7 @@ def _catalog_families(
     mod_bar: int,
     mod_tonic: int,
     harmonize_outliers: bool,
+    quiet_until: int = 0,
 ) -> list[dict]:
     pattern_catalog: list[dict] = []
     for fam in families:
@@ -363,7 +428,9 @@ def _catalog_families(
         for slot in range(period):
             slot_bars = [bars[inst["start_bar"] + slot] for inst in instances]
             slot_sigs = [sigs[inst["start_bar"] + slot] for inst in instances]
-            chosen_chords = canonical_chord_choice(slot_bars, slot_sigs)
+            chosen_chords = canonical_chord_choice(
+                slot_bars, slot_sigs, _lap_weights(instances, slot, quiet_until)
+            )
             canonical_chords.append(chosen_chords)
             info = parse_chord_symbol(
                 chosen_chords[-1]
@@ -375,7 +442,7 @@ def _catalog_families(
             canonical_functions.append(fn)
 
         if harmonize_outliers:
-            _harmonize_outliers(
+            _settle_laps(
                 instances,
                 period,
                 canonical_chords,
@@ -385,6 +452,7 @@ def _catalog_families(
                 tonic,
                 mod_tonic,
                 mode,
+                quiet_until,
             )
         _apply_secondary_dominant(
             period,
@@ -444,8 +512,13 @@ def discover_repeating_cycles(
     mode: str,
     harmonize_outliers: bool = True,
     modulation: dict | None = None,
+    quiet_until: int | None = None,
 ) -> tuple[list[dict], list[dict]]:
-    """Encontra ciclos harmônicos repetidos (com suporte a anacruse/turnaround e modulação)."""
+    """Encontra ciclos harmônicos repetidos (com suporte a anacruse/turnaround e modulação).
+
+    ``quiet_until`` é o compasso (contando de 0) em que a voz entra, quando se sabe:
+    as voltas antes dele pesam mais no voto da cifra do ciclo.
+    """
     n = len(bars)
     if n == 0:
         return [], []
@@ -485,7 +558,15 @@ def discover_repeating_cycles(
 
     families = _group_families(blocks, sigs)
     pattern_catalog = _catalog_families(
-        families, bars, sigs, tonic, mode, mod_bar, mod_tonic, harmonize_outliers
+        families,
+        bars,
+        sigs,
+        tonic,
+        mode,
+        mod_bar,
+        mod_tonic,
+        harmonize_outliers,
+        int(quiet_until or 0),
     )
     _rename_cycles(pattern_catalog, blocks)
     return blocks, pattern_catalog

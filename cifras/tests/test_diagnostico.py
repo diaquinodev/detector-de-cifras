@@ -184,6 +184,22 @@ class FormInvariantsTest(unittest.TestCase):
         self.assertEqual(case["esperado"], ["Am", "G", "F", "C"])
         self.assertEqual(case["escrito"], ["Am", "G G7 G", "G F7", "C"])
 
+    def test_a_lap_whose_differences_are_all_marked_is_counted_apart(self):
+        bars = self.coherent["compassos"]
+        bars[7] = {**bar(8, "G"), "variacao_do_ciclo": "C"}
+        report = form_invariants(self.coherent)
+        self.assertEqual(report["voltas_com_cifra_diferente"], [])
+        self.assertEqual(len(report["voltas_com_variacao_marcada"]), 1)
+        self.assertEqual(report["voltas_com_variacao_marcada"][0]["compasso"], 5)
+
+    def test_one_unmarked_difference_keeps_the_lap_as_different(self):
+        bars = self.coherent["compassos"]
+        bars[6] = bar(7, "F", "C")
+        bars[7] = {**bar(8, "G"), "variacao_do_ciclo": "C"}
+        report = form_invariants(self.coherent)
+        self.assertEqual(len(report["voltas_com_cifra_diferente"]), 1)
+        self.assertEqual(report["voltas_com_variacao_marcada"], [])
+
     def test_a_window_with_half_the_roots_is_not_a_lap(self):
         bars = self.coherent["compassos"]
         bars[4:8] = [bar(5, "Am"), bar(6, "D"), bar(7, "E"), bar(8, "C")]

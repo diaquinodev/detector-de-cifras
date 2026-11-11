@@ -200,7 +200,8 @@ def _laps(bars: list[dict], patterns: list[dict]) -> tuple[int, list[dict]]:
             if hits < math.ceil(LAP_MATCH * len(roots)):
                 continue
             laps += 1
-            written = [_bar_text(bar) for bar in bars[index : index + len(roots)]]
+            window_bars = bars[index : index + len(roots)]
+            written = [_bar_text(bar) for bar in window_bars]
             if written != chords:
                 different.append(
                     {
@@ -208,6 +209,11 @@ def _laps(bars: list[dict], patterns: list[dict]) -> tuple[int, list[dict]]:
                         "compasso": bars[index].get("bar", index + 1),
                         "esperado": chords,
                         "escrito": written,
+                        "marcada": all(
+                            bar.get("variacao_do_ciclo")
+                            for bar, text, chord in zip(window_bars, written, chords, strict=True)
+                            if text != chord
+                        ),
                     }
                 )
             index += len(roots)
@@ -251,7 +257,8 @@ def form_invariants(document: dict) -> dict:
         ],
         "compassos_sem_acorde_no_meio": int(silent_inside),
         "voltas": laps,
-        "voltas_com_cifra_diferente": different,
+        "voltas_com_cifra_diferente": [lap for lap in different if not lap["marcada"]],
+        "voltas_com_variacao_marcada": [lap for lap in different if lap["marcada"]],
         "ciclos_com_dois_nomes": {
             pattern: sorted(names)
             for pattern, names in sorted(names_by_pattern.items())
@@ -275,6 +282,9 @@ def form_summary(reports: dict[str, dict]) -> dict:
         "voltas": laps,
         "voltas_com_cifra_diferente": sum(
             len(r["voltas_com_cifra_diferente"]) for r in reports.values()
+        ),
+        "voltas_com_variacao_marcada": sum(
+            len(r.get("voltas_com_variacao_marcada") or []) for r in reports.values()
         ),
         "ciclos_com_dois_nomes": sum(len(r["ciclos_com_dois_nomes"]) for r in reports.values()),
     }
