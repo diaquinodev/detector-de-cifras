@@ -90,6 +90,24 @@ class FindPhrasesTest(unittest.TestCase):
         self.assertEqual(shape(phrases)[0], (1, 2, "silêncio"))
         self.assertEqual(phrase_starts(phrases)[1:], [2, 6, 10, 14])
 
+    def test_a_short_phrase_between_two_real_changes_stays_a_short_phrase(self):
+        # Dois compassos entre duas mudanças de verdade não são virada da frase de antes.
+        song = [*VERSE * 2, *CHORUS[:2], *BRIDGE * 2, *VERSE * 2, *CHORUS * 2]
+        phrases = find_phrases(chroma(song))
+        exceptions = [item for item in shape(phrases) if item[2] is not None]
+        self.assertEqual(exceptions, [(9, 2, "frase curta")])
+        self.assertEqual(phrase_starts(phrases)[:4], [0, 4, 8, 10])
+
+    def test_trailing_silence_is_set_apart_like_leading_silence(self):
+        phrases = find_phrases(chroma([*VERSE * 2, None, None]))
+        self.assertEqual(shape(phrases), [(1, 4, None), (5, 4, None), (9, 2, "silêncio")])
+
+    def test_silent_bars_in_the_middle_are_a_rest_inside_the_phrase(self):
+        song = [*VERSE, None, None, None, None, *VERSE * 2, *CHORUS * 2]
+        phrases = find_phrases(chroma(song))
+        self.assertEqual(phrase_starts(phrases), [0, 4, 8, 12, 16, 20])
+        self.assertTrue(all(phrase["excecao"] is None for phrase in phrases))
+
     def test_the_phrases_cover_every_bar_once(self):
         song = ["C", *VERSE * 3, "G", *CHORUS * 2, *BRIDGE, "D", "E"]
         phrases = find_phrases(chroma(song))

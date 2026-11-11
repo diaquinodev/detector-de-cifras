@@ -59,9 +59,11 @@ def novelty(bar_chroma: np.ndarray, size: int = PHRASE_BARS) -> np.ndarray:
     return peaks
 
 
-def _first_heard(bar_chroma: np.ndarray) -> int:
+def _heard_span(bar_chroma: np.ndarray) -> tuple[int, int]:
+    """Do primeiro compasso com som até logo depois do último. Sem som nenhum: vazio."""
     heard = np.flatnonzero(np.linalg.norm(bar_chroma, axis=0) > SILENT)
-    return int(heard[0]) if heard.size else int(bar_chroma.shape[1])
+    count = int(bar_chroma.shape[1])
+    return (int(heard[0]), int(heard[-1]) + 1) if heard.size else (count, count)
 
 
 def _reason(length: int, size: int, first: bool, last: bool) -> str | None:
@@ -74,14 +76,17 @@ def _reason(length: int, size: int, first: bool, last: bool) -> str | None:
     return "anacruse" if first else "frase curta"
 
 
-def _join_turnarounds(cuts: list[tuple[int, int]], size: int) -> list[tuple[int, int]]:
+def _join_turnarounds(
+    cuts: list[tuple[int, int]], size: int, gain: np.ndarray
+) -> list[tuple[int, int]]:
     """Um ou dois compassos soltos no meio da música ficam com a frase de antes.
 
-    É o caso comum: a frase ganha um compasso de virada antes de a música seguir.
+    É o caso comum: a frase ganha um compasso de virada antes de a música seguir. Se a
+    música muda de verdade onde o trecho solto começa, ele fica como frase curta.
     """
     joined: list[tuple[int, int]] = []
     for index, (begin, length) in enumerate(cuts):
-        loose = 0 < index < len(cuts) - 1 and length <= size // 2
+        loose = 0 < index < len(cuts) - 1 and length <= size // 2 and gain[begin] == 0.0
         if loose and joined and joined[-1][1] == size:
             joined[-1] = (joined[-1][0], size + length)
         else:
@@ -93,34 +98,35 @@ def find_phrases(bar_chroma: np.ndarray, size: int = PHRASE_BARS) -> list[dict]:
     """As frases da música, em ordem, cobrindo todos os compassos.
 
     Cada frase traz ``compasso`` (o primeiro, contando de 1), ``compassos`` (quantos) e
-    ``excecao`` (``None`` na frase regular; senão o motivo).
+    ``excecao`` (``None`` na frase regular; senão o motivo). Silêncio antes e depois da
+    música fica à parte; compasso sem som no meio conta como pausa dentro da frase.
     """
     count = int(bar_chroma.shape[1]) if bar_chroma.ndim == 2 else 0
     if count == 0:
         return []
-    start = _first_heard(bar_chroma)
+    start, stop = _heard_span(bar_chroma)
     gain = novelty(bar_chroma, size)
     lengths = [size, *range(1, size), size + 1, size + 2]
-    best = np.full(count + 1, -np.inf)
-    back = np.zeros(count + 1, dtype=int)
+    best = np.full(stop + 1, -np.inf)
+    back = np.zeros(stop + 1, dtype=int)
     best[start] = 0.0
-    for end in range(start + 1, count + 1):
+    for end in range(start + 1, stop + 1):
         for length in lengths:
             begin = end - length
             if begin < start or not np.isfinite(best[begin]):
                 continue
-            free = length == size or (end == count and length < size)
+            free = length == size or (end == stop and length < size)
             score = best[begin] + gain[end] - (0.0 if free else EXCEPTION_COST)
             if score > best[end]:
                 best[end] = score
                 back[end] = length
     cuts = []
-    end = count
+    end = stop
     while end > start:
         cuts.append((end - back[end], int(back[end])))
         end -= back[end]
     cuts.reverse()
-    cuts = _join_turnarounds(cuts, size)
+    cuts = _join_turnarounds(cuts, size, gain)
     phrases = []
     if start:
         phrases.append({"compasso": 1, "compassos": start, "excecao": "silêncio"})
@@ -132,6 +138,8 @@ def find_phrases(bar_chroma: np.ndarray, size: int = PHRASE_BARS) -> list[dict]:
                 "excecao": _reason(length, size, index == 0, index == len(cuts) - 1),
             }
         )
+    if start < stop < count:
+        phrases.append({"compasso": stop + 1, "compassos": count - stop, "excecao": "silêncio"})
     return phrases
 
 
