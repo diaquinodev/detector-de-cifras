@@ -288,6 +288,8 @@ def analyze(path: Path) -> dict:
         total,
     )
     document["frases"] = find_phrases(bar_chroma)
+    # O croma por compasso fica na cifra salva: as camadas de forma podem ser refeitas sem o áudio.
+    document["croma_compassos"] = np.round(bar_chroma.T, 4).tolist()
     return document
 
 
