@@ -51,6 +51,7 @@ from form import (
     estimate_sections,
     render,
 )
+from phrases import find_phrases
 from pulse import (
     bar_line_offset,
     detect_pulse,
@@ -271,7 +272,7 @@ def analyze(path: Path) -> dict:
     sections, voice, patterns, section_detector = map_form(path, samples, bars, key, bar_chroma)
     lap("estrutura")
     total = time.perf_counter() - clock_start
-    return chart_document(
+    document = chart_document(
         path,
         duration,
         pulse,
@@ -286,6 +287,8 @@ def analyze(path: Path) -> dict:
         stages,
         total,
     )
+    document["frases"] = find_phrases(bar_chroma)
+    return document
 
 
 def main() -> None:
