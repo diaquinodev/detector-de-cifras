@@ -20,17 +20,19 @@ QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tare
 - fase 5: a régua (`diagnostico.form_invariants`) conta à parte a volta cujas diferenças estão todas marcadas (`voltas_com_variacao_marcada`)
 - fase 5: 153 testes verdes no Windows; em "Flake" as cinco voltas do verso saem `Dm | F | Bb | F` e só o final (`C`) fica diferente
 
+- fase 5, medição nas 7 músicas locais (mesma régua, antes e depois): das 107 voltas, as escritas igual ao ciclo foram de 30 para 41; as diferentes sem marca caíram de 77 para 34 (32%); 32 ficaram diferentes com marca. A meta do plano (até 10% diferentes) não foi atingida
+
 ## Falta
-- medir as invariantes nas 7 músicas locais, antes e depois (as cifras antigas estão guardadas fora do repositório)
-- medir o GuitarSet e conferir que não caiu
+- GuitarSet rodando em segundo plano (`--resultados fase5.jsonl`, cerca de 70 min); comparar com `fase0.resumo.json`
+- olhar as 34 voltas ainda diferentes e as 32 marcadas: quantas são leitura errada e quantas são variação de verdade (só gabarito responde; vem do editor)
 - decidir `repeats.lock_repeated_phrases`: o plano manda apagar, mas ela compara o áudio e não a cifra; só sai se a medição mostrar que não faz falta
 - PR draft, revisão cruzada pelo Codex
 
 ## Próximo comando
-python cifras/diagnostico.py --help, rodar as invariantes sobre cifras/saida e comparar com a linha de base da fase 0 (24 de 81 seções fora de frase, 80 de 111 voltas diferentes)
+python cifras/benchmark_guitarset.py D:/PROJETOS/moises-rea/dados/guitarset --resultados fase5.jsonl --resumo, comparar majmin e classes com a fase 0 e abrir o PR draft
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-11 19:12
+2026-11-11 19:28
