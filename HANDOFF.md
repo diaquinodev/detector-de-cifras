@@ -22,17 +22,16 @@ QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tare
 
 - fase 5, medição nas 7 músicas locais (mesma régua, antes e depois): das 107 voltas, as escritas igual ao ciclo foram de 30 para 41; as diferentes sem marca caíram de 77 para 34 (32%); 32 ficaram diferentes com marca. A meta do plano (até 10% diferentes) não foi atingida
 
+- fase 5, GuitarSet (180 trechos, mesmo comando da fase 0): maior/menor 77,87% -> 78,18%; fundamental 81,31% -> 81,52%; com sétimas 65,81% -> 66,52%. Nenhum estilo caiu (voz e violão 91,10 -> 91,63; rock 90,04 -> 90,19; bossa 80,25 -> 80,67; jazz 65,16 -> 65,55; funk 58,09 -> 58,13). 36 trechos melhoraram e 11 pioraram (o pior perdeu 6,7 pontos); compassos ajustados por regra foram de 72 para 174
+
 ## Falta
-- GuitarSet rodando em segundo plano (`--resultados fase5.jsonl`, cerca de 70 min); comparar com `fase0.resumo.json`
-- olhar as 34 voltas ainda diferentes e as 32 marcadas: quantas são leitura errada e quantas são variação de verdade (só gabarito responde; vem do editor)
-- decidir `repeats.lock_repeated_phrases`: o plano manda apagar, mas ela compara o áudio e não a cifra; só sai se a medição mostrar que não faz falta
-- PR draft, revisão cruzada pelo Codex
+- nada nesta fase além da revisão. Ficou fora, de propósito: `repeats.lock_repeated_phrases` continua (o plano mandava apagar; ela compara o áudio, não a cifra, e não foi medido se faz falta); a marca `variacao_do_ciclo` ainda não aparece na página; a meta de até 10% de voltas diferentes não foi atingida (32%)
 
 ## Próximo comando
-python cifras/benchmark_guitarset.py D:/PROJETOS/moises-rea/dados/guitarset --resultados fase5.jsonl --resumo, comparar majmin e classes com a fase 0 e abrir o PR draft
+revisão cruzada do PR desta branch pelo Codex (autor: Claude Code)
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-11 19:28
+2026-11-11 20:30
