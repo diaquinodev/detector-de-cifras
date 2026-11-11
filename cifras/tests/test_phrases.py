@@ -102,6 +102,14 @@ class FindPhrasesTest(unittest.TestCase):
         phrases = find_phrases(chroma([*VERSE * 2, None, None]))
         self.assertEqual(shape(phrases), [(1, 4, None), (5, 4, None), (9, 2, "silêncio")])
 
+    def test_silence_at_the_ends_does_not_move_the_phrases_of_the_music(self):
+        song = [*VERSE * 2, *CHORUS[:2], *BRIDGE * 2, *VERSE * 2, *CHORUS * 2]
+        plain = shape(find_phrases(chroma(song)))
+        padded = shape(find_phrases(chroma([None, None, *song, None, None])))
+        self.assertEqual(padded[0], (1, 2, "silêncio"))
+        self.assertEqual(padded[-1], (len(song) + 3, 2, "silêncio"))
+        self.assertEqual([(bar + 2, size, why) for bar, size, why in plain], padded[1:-1])
+
     def test_silent_bars_in_the_middle_are_a_rest_inside_the_phrase(self):
         song = [*VERSE, None, None, None, None, *VERSE * 2, *CHORUS * 2]
         phrases = find_phrases(chroma(song))

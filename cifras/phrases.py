@@ -105,7 +105,9 @@ def find_phrases(bar_chroma: np.ndarray, size: int = PHRASE_BARS) -> list[dict]:
     if count == 0:
         return []
     start, stop = _heard_span(bar_chroma)
-    gain = novelty(bar_chroma, size)
+    # A novidade só olha o trecho com som: silêncio nas pontas criaria uma mudança falsa.
+    gain = np.zeros(count + 1, dtype=float)
+    gain[start : stop + 1] = novelty(bar_chroma[:, start:stop], size)
     lengths = [size, *range(1, size), size + 1, size + 2]
     best = np.full(stop + 1, -np.inf)
     back = np.zeros(stop + 1, dtype=int)

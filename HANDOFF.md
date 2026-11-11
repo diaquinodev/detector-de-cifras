@@ -15,8 +15,8 @@ QG: brain/plans/detector-de-cifras-refino/phase-3-frases.md (tarefa 107). A orde
 ## Feito
 - plano anterior (organização) concluído: PRs #1 a #4
 - fase 0 do refino (régua de erros) integrada: PR #5
-- fase 3: `cifras/phrases.py` agrupa os compassos em frases de 4 pelo áudio (novidade entre compassos), com exceções nomeadas (anacruse, compasso extra, frase curta, final incompleto, silêncio); 14 testes sintéticos
-- revisão do Codex no commit d44ad7d (Revise, 2 achados) tratada: silêncio no fim fica à parte e silêncio no meio é pausa dentro da frase; compasso solto só se junta à frase anterior quando a música não muda ali
+- fase 3: `cifras/phrases.py` agrupa os compassos em frases de 4 pelo áudio (novidade entre compassos), com exceções nomeadas (anacruse, compasso extra, frase curta, final incompleto, silêncio); 15 testes sintéticos
+- revisão do Codex no commit d44ad7d (Revise, 2 achados) tratada: silêncio no fim fica à parte e silêncio no meio é pausa dentro da frase; compasso solto só se junta à frase anterior quando a música não muda ali; segunda rodada (95b0079, 1 achado): a novidade passa a olhar só o trecho com som
 - fase 3: `analyze.py` grava a lista `frases` na cifra salva; nenhuma seção nem acorde muda ainda
 - fase 3 nas 7 músicas locais: 154 frases, 13 exceções; em "Flake" a exceção do compasso 17 corresponde a meio ciclo a mais antes da parte seguinte
 
@@ -31,4 +31,4 @@ revisão cruzada do PR da fase 3 por um agente diferente do autor (Codex); depoi
 nenhum
 
 ## Atualizado em
-2026-11-11 14:52
+2026-11-11 14:38
