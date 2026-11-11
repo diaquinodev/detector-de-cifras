@@ -16,18 +16,18 @@ QG: brain/plans/detector-de-cifras-refino/phase-0-regua-de-erros.md (tarefa 104)
 - plano anterior (organização) concluído: PRs #1 a #4
 - fase 0 do refino: `cifras/diagnostico.py` (classes de erro dos acordes e invariantes de forma) com 17 testes sintéticos
 - fase 0 do refino: `benchmark_guitarset.py` grava as classes de erro de cada trecho e aceita `--resultados <arquivo>`
-- invariantes medidas nas 9 cifras antigas do laboratório: 18 de 83 seções fora de frase, 5 seções curtas, 81 de 114 voltas com cifra diferente do ciclo
+- linha de base de 11/11 no GuitarSet (180 trechos): root 81,31%, majmin 77,87%; sem_acorde_indevido 3,12% do tempo (funk 9,89%, jazz 5,10%); certo + qualidade = root
+- invariantes nas 9 cifras de `cifras/saida` com o código atual: 19 de 81 seções fora de frase, 5 curtas, 23 compassos "N" no meio, 80 de 111 voltas com cifra diferente
+- resultado completo e metas gravados no plano do QG
 
 ## Falta
-- rodar o benchmark do GuitarSet de novo (180 trechos, perto de 2 horas) com `--resultados fase0.jsonl` e gravar a linha de base das classes de erro
-- medir as invariantes nas cifras geradas pelo código atual (as do laboratório são de 08 a 10/11)
-- escrever o Resultado e as metas no plano do QG; revisão do Codex; tirar o PR do rascunho
+- nada nesta fase além da revisão cruzada e do merge
 
 ## Próximo comando
-python cifras/benchmark_guitarset.py D:/PROJETOS/moises-rea/dados/guitarset --resultados fase0.jsonl (continua de onde parou); depois python cifras/diagnostico.py cifras/saida
+revisão cruzada do PR #5 por um agente diferente do autor (Codex); depois do merge, fase 1 do plano (QG: brain/plans/detector-de-cifras-refino/phase-1-sem-acorde-indevido.md), branch fase/1-sem-acorde-indevido a partir da main
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-11 07:28
+2026-11-11 08:50
