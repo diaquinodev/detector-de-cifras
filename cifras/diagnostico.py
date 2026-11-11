@@ -59,15 +59,20 @@ def parse_harte(label: str) -> tuple[int | None, str]:
     name, _, quality = head.partition(":")
     if name not in ROOTS:
         return None, "X"
-    shorthand = quality.split("(")[0]
+    shorthand, _, listed = quality.partition("(")
+    degrees = {degree.strip() for degree in listed.rstrip(")").split(",")}
     if not quality:
+        third = "maj"
+    elif not shorthand and "b3" in degrees:
+        third = "min"
+    elif not shorthand and "3" in degrees:
         third = "maj"
     elif shorthand.startswith(MINOR_PREFIXES):
         third = "min"
     elif shorthand.startswith(MAJOR_PREFIXES):
         third = "maj"
     else:
-        third = "?"  # sus, quinta sozinha ou lista de graus: a terça não está escrita
+        third = "?"  # sus, quinta sozinha ou lista de graus sem terça
     return ROOTS[name], third
 
 
@@ -94,6 +99,24 @@ def classify(reference: str, estimate: str) -> str:
     return "outra_fundamental"
 
 
+def _without_overlap(
+    intervals: list[tuple[float, float]], labels: list[str]
+) -> tuple[list[tuple[float, float]], list[str]]:
+    """Põe os trechos em ordem e corta cada um onde o seguinte começa.
+
+    Sem isso, dois trechos sobrepostos dariam resultado diferente conforme a ordem do arquivo.
+    """
+    ordered = sorted(zip(intervals, labels, strict=True))
+    flat, names = [], []
+    for index, ((start, end), label) in enumerate(ordered):
+        if index + 1 < len(ordered):
+            end = min(end, ordered[index + 1][0][0])
+        if end > start:
+            flat.append((start, end))
+            names.append(label)
+    return flat, names
+
+
 def _label_at(intervals: list[tuple[float, float]], labels: list[str], moment: float) -> str:
     for (start, end), label in zip(intervals, labels, strict=True):
         if start <= moment < end:
@@ -112,6 +135,8 @@ def error_classes(
     Onde a cifra não diz nada, vale "N". A soma das classes é a duração do gabarito.
     """
     seconds = dict.fromkeys(CLASSES, 0.0)
+    ref_intervals, ref_labels = _without_overlap(ref_intervals, ref_labels)
+    est_intervals, est_labels = _without_overlap(est_intervals, est_labels)
     if not ref_intervals:
         return seconds
     first = min(start for start, _ in ref_intervals)
@@ -155,6 +180,11 @@ def _root(symbol: str) -> int | None:
 
 def _bar_text(bar: dict) -> str:
     return " ".join(bar.get("chords") or ["N"])
+
+
+def _is_silent(bar: dict) -> bool:
+    """Compasso sem acorde nenhum: "N", "N.C." ou vazio, uma ou mais vezes."""
+    return all(to_harte(str(chord)) == "N" for chord in bar.get("chords") or ["N"])
 
 
 def _laps(bars: list[dict], patterns: list[dict]) -> tuple[int, list[dict]]:
@@ -204,12 +234,17 @@ def form_invariants(document: dict) -> dict:
     bars = document.get("compassos") or []
     sections = document.get("secoes") or []
     sizes = [(str(section.get("name")), len(section.get("bars") or [])) for section in sections]
-    inner = sizes[1:-1] if len(sizes) > 2 else []
-    sounding = [index for index, bar in enumerate(bars) if _bar_text(bar) != "N"]
+    # Só introdução, outro e silêncio nas pontas ficam de fora: anacruse e final cortado
+    # são comuns ali. Um verso de 1 compasso abrindo a música continua sendo defeito.
+    last = len(sizes) - 1
+    inner = [
+        (name, size)
+        for index, (name, size) in enumerate(sizes)
+        if not (index in {0, last} and name in EDGE_NAMES)
+    ]
+    sounding = [index for index, bar in enumerate(bars) if not _is_silent(bar)]
     silent_inside = (
-        sum(_bar_text(bar) == "N" for bar in bars[sounding[0] : sounding[-1] + 1])
-        if sounding
-        else 0
+        sum(_is_silent(bar) for bar in bars[sounding[0] : sounding[-1] + 1]) if sounding else 0
     )
     names_by_pattern: dict[str, set[str]] = defaultdict(set)
     for section in sections:

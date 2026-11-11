@@ -41,6 +41,8 @@ class ParseHarteTest(unittest.TestCase):
             "Bb:maj/3": (10, "maj"),
             "D:sus4(b7)": (2, "?"),
             "C:(1,5,b7)/1": (0, "?"),
+            "C:(1,3,5)": (0, "maj"),
+            "C:(1,b3,5)": (0, "min"),
             "N": (None, "N"),
             "X": (None, "X"),
             "H:maj": (None, "X"),
@@ -75,6 +77,9 @@ class ClassifyTest(unittest.TestCase):
     def test_a_sus_chord_on_the_right_root_is_not_a_quality_error(self):
         self.assertEqual(classify("C:maj", "C:sus4"), "certo")
 
+    def test_a_degree_list_with_a_minor_third_is_a_quality_error(self):
+        self.assertEqual(classify("C:(1,b3,5)", "C:maj"), "qualidade")
+
     def test_the_major_a_sixth_above_is_not_the_relative(self):
         # Lá maior no lugar de Dó maior não é a relativa (que seria Lá menor).
         self.assertEqual(classify("C:maj", "A:maj"), "outra_fundamental")
@@ -97,6 +102,18 @@ class ErrorClassesTest(unittest.TestCase):
         seconds = error_classes([(2.0, 4.0)], ["C:maj"], [(0.0, 10.0)], ["C:maj"])
         self.assertEqual(seconds["certo"], 2.0)
         self.assertAlmostEqual(sum(seconds.values()), 2.0)
+
+    def test_overlapping_intervals_do_not_depend_on_the_file_order(self):
+        intervals = [(0.0, 3.0), (2.0, 4.0)]
+        labels = ["C:maj", "G:maj"]
+        estimate = ([(0.0, 4.0)], ["C:maj"])
+        straight = error_classes(intervals, labels, *estimate)
+        reversed_order = error_classes(intervals[::-1], labels[::-1], *estimate)
+        self.assertEqual(straight, reversed_order)
+        # O trecho que começa depois vale a partir do início dele: 2 s de Dó, 2 s de Sol.
+        self.assertEqual(straight["certo"], 2.0)
+        self.assertEqual(straight["quinta_abaixo"], 2.0)
+        self.assertAlmostEqual(sum(straight.values()), 4.0)
 
     def test_an_empty_reference_measures_nothing(self):
         seconds = error_classes([], [], [(0.0, 1.0)], ["C:maj"])
@@ -173,7 +190,7 @@ class FormInvariantsTest(unittest.TestCase):
             section("outro", "Ciclo A", bars[13:16]),
         ]
         report = form_invariants(self.coherent)
-        # A primeira e a última seção ficam de fora: anacruse e final cortado são comuns.
+        # Introdução e outro nas pontas ficam de fora: anacruse e final cortado são comuns.
         self.assertEqual(
             report["secoes_fora_de_frase"],
             [{"nome": "verso", "compassos": 5}, {"nome": "pré-refrão", "compassos": 1}],
@@ -187,6 +204,27 @@ class FormInvariantsTest(unittest.TestCase):
         bars[9] = bar(10, "N")
         bars[15] = bar(16, "N")
         self.assertEqual(form_invariants(self.coherent)["compassos_sem_acorde_no_meio"], 1)
+
+    def test_silence_written_in_other_ways_is_still_silence(self):
+        bars = self.coherent["compassos"]
+        bars[0] = bar(1, "N", "N")
+        bars[9] = bar(10, "N", "N")
+        bars[10] = bar(11, "N.C.")
+        self.assertEqual(form_invariants(self.coherent)["compassos_sem_acorde_no_meio"], 2)
+
+    def test_a_short_verse_at_the_edge_is_still_reported(self):
+        bars = self.coherent["compassos"]
+        self.coherent["secoes"] = [
+            section("verso", "Ciclo A", bars[0:1]),
+            section("verso", "Ciclo A", bars[1:9]),
+            section("refrão", "Ciclo A", bars[9:16]),
+        ]
+        report = form_invariants(self.coherent)
+        self.assertEqual(
+            report["secoes_fora_de_frase"],
+            [{"nome": "verso", "compassos": 1}, {"nome": "refrão", "compassos": 7}],
+        )
+        self.assertEqual(report["secoes_curtas"], [{"nome": "verso", "compassos": 1}])
 
     def test_a_one_chord_vamp_is_not_used_as_a_cycle(self):
         self.coherent["padroes_harmonicos"] = [

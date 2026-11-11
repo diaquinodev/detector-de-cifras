@@ -66,7 +66,12 @@ def run(root: Path, results: Path) -> None:
 
     refs = root / "referencias"
     refs.mkdir(exist_ok=True)
-    done = {entry["trecho"] for entry in latest_entries(results) if "erro" not in entry}
+    # Resultado antigo sem as classes de erro é medido de novo: a régua não vale pela metade.
+    done = {
+        entry["trecho"]
+        for entry in latest_entries(results)
+        if "erro" not in entry and "classes_s" in entry
+    }
     pending = [path for path in sorted(root.glob("*_comp.jams")) if path.stem not in done]
     print(f"{len(done)} feitos, {len(pending)} pendentes", flush=True)
     for number, jams_path in enumerate(pending, start=1):
@@ -163,6 +168,7 @@ def summary(results: Path) -> dict:
         "acordes_final": chords(good, "final") if good else None,
         "acordes_so_modelo": chords(good, "so_modelo") if good else None,
         "classes_de_erro": classes(good),
+        "trechos_com_classes": sum("classes_s" in entry for entry in good),
         "ritmo": beats(good) if good else None,
         "por_estilo": {
             style: {
