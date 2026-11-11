@@ -192,6 +192,13 @@ class FormInvariantsTest(unittest.TestCase):
         self.assertEqual(len(report["voltas_com_variacao_marcada"]), 1)
         self.assertEqual(report["voltas_com_variacao_marcada"][0]["compasso"], 5)
 
+    def test_a_mark_naming_another_chord_does_not_count(self):
+        bars = self.coherent["compassos"]
+        bars[7] = {**bar(8, "G"), "variacao_do_ciclo": "F"}
+        report = form_invariants(self.coherent)
+        self.assertEqual(len(report["voltas_com_cifra_diferente"]), 1)
+        self.assertEqual(report["voltas_com_variacao_marcada"], [])
+
     def test_one_unmarked_difference_keeps_the_lap_as_different(self):
         bars = self.coherent["compassos"]
         bars[6] = bar(7, "F", "C")

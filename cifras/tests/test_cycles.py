@@ -117,6 +117,15 @@ class LapVoteTest(unittest.TestCase):
         discover_repeating_cycles(bars, F_MAJOR, "maior")
         self.assertEqual(written(bars)[8:12], ["Dm", "C", "Gm", "F"])
 
+    def test_a_two_bar_cycle_is_left_alone_and_unmarked(self):
+        pair = ["F", "C"]
+        bars = song(pair, ["F", ("C G", 0.5)], pair)
+        _, catalog = discover_repeating_cycles(bars, F_MAJOR, "maior")
+        self.assertEqual(catalog[0]["compassos_por_ciclo"], 2)
+        self.assertEqual(catalog[0]["repeticoes"], 3)
+        self.assertEqual(written(bars)[2:4], ["F", "C G"])
+        self.assertFalse(any("variacao_do_ciclo" in bar or "regra" in bar for bar in bars))
+
 
 if __name__ == "__main__":
     unittest.main()

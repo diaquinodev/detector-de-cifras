@@ -20,18 +20,20 @@ QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tare
 - fase 5: a régua (`diagnostico.form_invariants`) conta à parte a volta cujas diferenças estão todas marcadas (`voltas_com_variacao_marcada`)
 - fase 5: 153 testes verdes no Windows; em "Flake" as cinco voltas do verso saem `Dm | F | Bb | F` e só o final (`C`) fica diferente
 
-- fase 5, medição nas 7 músicas locais (mesma régua, antes e depois): das 107 voltas, as escritas igual ao ciclo foram de 30 para 41; as diferentes sem marca caíram de 77 para 34 (32%); 32 ficaram diferentes com marca. A meta do plano (até 10% diferentes) não foi atingida
+- fase 5, medição nas 7 músicas locais (mesma régua, antes e depois): das 107 voltas, as escritas igual ao ciclo foram de 30 para 41; as diferentes sem marca caíram de 77 para 38 (36%); 28 ficaram diferentes com marca (a marca só conta quando diz o acorde que a régua esperava). A meta do plano (até 10% diferentes) não foi atingida
 
 - fase 5, GuitarSet (180 trechos, mesmo comando da fase 0): maior/menor 77,87% -> 78,18%; fundamental 81,31% -> 81,52%; com sétimas 65,81% -> 66,52%. Nenhum estilo caiu (voz e violão 91,10 -> 91,63; rock 90,04 -> 90,19; bossa 80,25 -> 80,67; jazz 65,16 -> 65,55; funk 58,09 -> 58,13). 36 trechos melhoraram e 11 pioraram (o pior perdeu 6,7 pontos); compassos ajustados por regra foram de 72 para 174
 
+- revisão do Codex no PR #7 (Revise, 3 achados) atendida: a entrada da voz medida pelo perfil também pesa no voto; ciclo de 2 compassos fica de fora, dito no texto e testado; a marca só conta na régua quando diz o acorde esperado. 158 testes verdes
+
 ## Falta
-- nada nesta fase além da revisão. Ficou fora, de propósito: `repeats.lock_repeated_phrases` continua (o plano mandava apagar; ela compara o áudio, não a cifra, e não foi medido se faz falta); a marca `variacao_do_ciclo` ainda não aparece na página; a meta de até 10% de voltas diferentes não foi atingida (32%)
+- nada nesta fase além da revisão. Ficou fora, de propósito: `repeats.lock_repeated_phrases` continua (o plano mandava apagar; ela compara o áudio, não a cifra, e não foi medido se faz falta); a marca `variacao_do_ciclo` ainda não aparece na página; a meta de até 10% de voltas diferentes não foi atingida (36%)
 
 ## Próximo comando
-revisão cruzada do PR desta branch pelo Codex (autor: Claude Code)
+nova revisão cruzada do PR #7 pelo Codex, no commit com as correções (autor: Claude Code)
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-11 20:30
+2026-11-11 20:35

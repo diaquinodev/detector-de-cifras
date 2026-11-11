@@ -209,8 +209,10 @@ def _laps(bars: list[dict], patterns: list[dict]) -> tuple[int, list[dict]]:
                         "compasso": bars[index].get("bar", index + 1),
                         "esperado": chords,
                         "escrito": written,
+                        # A marca vale quando diz o acorde esperado ali; marca de outro
+                        # ciclo ou antiga não tira a volta da conta das diferentes.
                         "marcada": all(
-                            bar.get("variacao_do_ciclo")
+                            bar.get("variacao_do_ciclo") == chord
                             for bar, text, chord in zip(window_bars, written, chords, strict=True)
                             if text != chord
                         ),

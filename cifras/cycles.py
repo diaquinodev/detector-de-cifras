@@ -310,6 +310,9 @@ def _settle_laps(
     confiança; o ciclo é maior e o compasso pisca para o menor; ou o compasso traz o acorde
     do ciclo com outro de passagem e a maioria das voltas (a volta sem voz vale mais) não
     tem essa passagem. Diferença que sobra ganha ``variacao_do_ciclo``.
+
+    Ciclo com menos de 4 compassos fica como está, sem troca e sem marca: com 2 posições,
+    "todas menos uma" aceitaria como volta um trecho que só tem um compasso em comum.
     """
     if len(instances) < 2 or period < 4:
         return
