@@ -12,7 +12,12 @@ pós-processamento, não a rede.
     python cifras/benchmark_guitarset.py dados/guitarset --resumo
 
 Cada trecho vai para resultados.jsonl assim que termina; rodar de novo continua
-de onde parou.
+de onde parou. Para medir de novo depois de mudar o código, use outro arquivo:
+
+    python cifras/benchmark_guitarset.py dados/guitarset --resultados fase0.jsonl
+
+O resumo traz também as classes de erro (ver diagnostico.py): que parte do tempo
+saiu sem acorde, com a relativa, uma quinta acima...
 """
 
 from __future__ import annotations
@@ -53,15 +58,20 @@ def references(jams_path: Path, folder: Path) -> tuple[Path, Path, float]:
     return lab, beat_file, float(jam["file_metadata"]["duration"])
 
 
-def run(root: Path) -> None:
+def run(root: Path, results: Path) -> None:
     import mir_eval
     from analyze import analyze
-    from avaliar import evaluate_beats, evaluate_chords
+    from avaliar import chord_intervals, evaluate_beats, evaluate_chords
+    from diagnostico import error_classes, read_lab
 
     refs = root / "referencias"
     refs.mkdir(exist_ok=True)
-    results = root / "resultados.jsonl"
-    done = {entry["trecho"] for entry in latest_entries(root) if "erro" not in entry}
+    # Resultado antigo sem as classes de erro é medido de novo: a régua não vale pela metade.
+    done = {
+        entry["trecho"]
+        for entry in latest_entries(results)
+        if "erro" not in entry and "classes_s" in entry
+    }
     pending = [path for path in sorted(root.glob("*_comp.jams")) if path.stem not in done]
     print(f"{len(done)} feitos, {len(pending)} pendentes", flush=True)
     for number, jams_path in enumerate(pending, start=1):
@@ -75,7 +85,12 @@ def run(root: Path) -> None:
             lab, beat_file, duration = references(jams_path, refs)
             data = analyze(audio)
             entry["duracao_s"] = duration
-            entry["acordes"] = evaluate_chords(mir_eval, lab, data.get("compassos") or [])
+            bars = data.get("compassos") or []
+            entry["acordes"] = evaluate_chords(mir_eval, lab, bars)
+            estimated, labels = chord_intervals(bars, model_only=False)
+            entry["classes_s"] = error_classes(
+                *read_lab(lab), [tuple(pair) for pair in estimated.tolist()], labels
+            )
             entry["ritmo"] = evaluate_beats(mir_eval, beat_file, data)
             entry["bpm"] = data["pulsacao"]["bpm"]
             entry["compasso"] = data["compasso"]["tempos_por_compasso"]
@@ -93,8 +108,7 @@ def run(root: Path) -> None:
         )
 
 
-def latest_entries(root: Path) -> list[dict]:
-    results = root / "resultados.jsonl"
+def latest_entries(results: Path) -> list[dict]:
     if not results.is_file():
         return []
     latest = {}
@@ -105,8 +119,10 @@ def latest_entries(root: Path) -> list[dict]:
     return list(latest.values())
 
 
-def summary(root: Path) -> dict:
-    entries = latest_entries(root)
+def summary(results: Path) -> dict:
+    from diagnostico import class_shares
+
+    entries = latest_entries(results)
     good = [entry for entry in entries if "erro" not in entry]
 
     def chords(group: list[dict], variant: str) -> dict:
@@ -133,6 +149,10 @@ def summary(root: Path) -> dict:
         out["compasso_4"] = round(sum(entry["compasso"] == 4 for entry in group) / len(group), 4)
         return out
 
+    def classes(group: list[dict]) -> dict | None:
+        measured = [entry["classes_s"] for entry in group if "classes_s" in entry]
+        return class_shares(measured) if measured else None
+
     styles = defaultdict(list)
     for entry in good:
         styles[entry["estilo"]].append(entry)
@@ -147,12 +167,15 @@ def summary(root: Path) -> dict:
         "erros": [entry["trecho"] for entry in entries if "erro" in entry],
         "acordes_final": chords(good, "final") if good else None,
         "acordes_so_modelo": chords(good, "so_modelo") if good else None,
+        "classes_de_erro": classes(good),
+        "trechos_com_classes": sum("classes_s" in entry for entry in good),
         "ritmo": beats(good) if good else None,
         "por_estilo": {
             style: {
                 "n": len(group),
                 "majmin_final": chords(group, "final")["majmin"],
                 "majmin_so_modelo": chords(group, "so_modelo")["majmin"],
+                "classes_de_erro": classes(group),
             }
             for style, group in sorted(styles.items())
         },
@@ -166,17 +189,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Avalia o pipeline no GuitarSet.")
     parser.add_argument("pasta", type=Path)
     parser.add_argument("--resumo", action="store_true")
+    parser.add_argument(
+        "--resultados",
+        default="resultados.jsonl",
+        help="arquivo de resultados dentro da pasta (padrão: resultados.jsonl)",
+    )
     args = parser.parse_args()
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     root = args.pasta.resolve()
+    results = root / Path(args.resultados).name
     if not args.resumo:
-        run(root)
-    report = summary(root)
-    (root / "resumo.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+        run(root, results)
+    report = summary(results)
+    resumo = "resumo.json" if results.name == "resultados.jsonl" else f"{results.stem}.resumo.json"
+    (root / resumo).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
