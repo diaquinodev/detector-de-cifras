@@ -4,28 +4,30 @@
 Claude Code
 
 ## Branch
-fix/readme-e-handoff
+fase/0-regua-de-erros
 
 ## Trilha
-rápida
+grande
 
 ## Plano/fase
-QG: brain/plans/detector-de-cifras/overview.md (as três fases estão concluídas)
+QG: brain/plans/detector-de-cifras-refino/phase-0-regua-de-erros.md (tarefa 104)
 
 ## Feito
-- fase 0 (PR #1): código e pesquisa importados do laboratório, sem áudio, pesos nem dados
-- fase 1 (PR #2): estilo com ruff e ruff no CI
-- fase 2 (PR #3): `scripts/baixar_modelos.py` baixa e prepara os pesos do Beat This! e do BTC
-- README: sem torch são 7 os testes pulados (o texto dizia 5)
+- plano anterior (organização) concluído: PRs #1 a #4
+- fase 0 do refino: `cifras/diagnostico.py` (classes de erro dos acordes e invariantes de forma) com 17 testes sintéticos
+- fase 0 do refino: `benchmark_guitarset.py` grava as classes de erro de cada trecho e aceita `--resultados <arquivo>`
+- invariantes medidas nas 9 cifras antigas do laboratório: 18 de 83 seções fora de frase, 5 seções curtas, 81 de 114 voltas com cifra diferente do ciclo
 
 ## Falta
-- nada neste plano
+- rodar o benchmark do GuitarSet de novo (180 trechos, perto de 2 horas) com `--resultados fase0.jsonl` e gravar a linha de base das classes de erro
+- medir as invariantes nas cifras geradas pelo código atual (as do laboratório são de 08 a 10/11)
+- escrever o Resultado e as metas no plano do QG; revisão do Codex; tirar o PR do rascunho
 
 ## Próximo comando
-ideia nova (ex.: violão lido em mi menor em vez de lá menor; troca de acorde no tempo 3): fazer o brainstorm no QG antes de planejar
+python cifras/benchmark_guitarset.py D:/PROJETOS/moises-rea/dados/guitarset --resultados fase0.jsonl (continua de onde parou); depois python cifras/diagnostico.py cifras/saida
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-10 21:40
+2026-11-11 07:28
