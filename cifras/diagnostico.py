@@ -99,29 +99,19 @@ def classify(reference: str, estimate: str) -> str:
     return "outra_fundamental"
 
 
-def _without_overlap(
-    intervals: list[tuple[float, float]], labels: list[str]
-) -> tuple[list[tuple[float, float]], list[str]]:
-    """Põe os trechos em ordem e corta cada um onde o seguinte começa.
-
-    Sem isso, dois trechos sobrepostos dariam resultado diferente conforme a ordem do arquivo.
-    """
-    ordered = sorted(zip(intervals, labels, strict=True))
-    flat, names = [], []
-    for index, ((start, end), label) in enumerate(ordered):
-        if index + 1 < len(ordered):
-            end = min(end, ordered[index + 1][0][0])
-        if end > start:
-            flat.append((start, end))
-            names.append(label)
-    return flat, names
-
-
 def _label_at(intervals: list[tuple[float, float]], labels: list[str], moment: float) -> str:
-    for (start, end), label in zip(intervals, labels, strict=True):
-        if start <= moment < end:
-            return label
-    return "N"
+    """O rótulo que vale num instante; sem trecho nenhum ali, "N".
+
+    Se dois trechos se sobrepõem, vale o que começou por último (empate: o que termina
+    antes). Assim o resultado não depende da ordem do arquivo, e um trecho curto dentro
+    de um longo não apaga o resto do longo.
+    """
+    covering = [
+        (start, -end, label)
+        for (start, end), label in zip(intervals, labels, strict=True)
+        if start <= moment < end
+    ]
+    return max(covering)[2] if covering else "N"
 
 
 def error_classes(
@@ -135,8 +125,6 @@ def error_classes(
     Onde a cifra não diz nada, vale "N". A soma das classes é a duração do gabarito.
     """
     seconds = dict.fromkeys(CLASSES, 0.0)
-    ref_intervals, ref_labels = _without_overlap(ref_intervals, ref_labels)
-    est_intervals, est_labels = _without_overlap(est_intervals, est_labels)
     if not ref_intervals:
         return seconds
     first = min(start for start, _ in ref_intervals)

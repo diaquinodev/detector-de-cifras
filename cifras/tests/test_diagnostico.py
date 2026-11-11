@@ -115,6 +115,17 @@ class ErrorClassesTest(unittest.TestCase):
         self.assertEqual(straight["quinta_abaixo"], 2.0)
         self.assertAlmostEqual(sum(straight.values()), 4.0)
 
+    def test_a_short_interval_inside_a_long_one_keeps_the_whole_window(self):
+        intervals = [(0.0, 10.0), (2.0, 3.0)]
+        labels = ["C:maj", "G:maj"]
+        estimate = ([(0.0, 10.0)], ["C:maj"])
+        straight = error_classes(intervals, labels, *estimate)
+        self.assertEqual(straight, error_classes(intervals[::-1], labels[::-1], *estimate))
+        # Sol vale só de 2 a 3; antes e depois continua valendo Dó, até o fim do gabarito.
+        self.assertEqual(straight["certo"], 9.0)
+        self.assertEqual(straight["quinta_abaixo"], 1.0)
+        self.assertAlmostEqual(sum(straight.values()), 10.0)
+
     def test_an_empty_reference_measures_nothing(self):
         seconds = error_classes([], [], [(0.0, 1.0)], ["C:maj"])
         self.assertEqual(sum(seconds.values()), 0.0)
