@@ -4,13 +4,13 @@
 Claude Code
 
 ## Branch
-chore/autor-do-pr
+editor/1-barra-de-repeticao
 
 ## Trilha
 rápida
 
 ## Plano/fase
-QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tarefa 109). Rumo confirmado pelo usuário em 11/11: (1) uma cifra por volta usando os ciclos lidos na cifra; (2) editor na página cujas correções viram gabarito
+QG: brain/plans/detector-de-cifras-editor/overview.md (editor; barra de repetição pedida pelo usuário em 11/11) e brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tarefa 109, na branch de baixo)
 
 ## Feito
 - plano anterior (organização) concluído: PRs #1 a #4
@@ -31,15 +31,19 @@ QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tare
 
 - revisão do Codex no PR #8 (Revise, 3 achados): corrigido o que era desta mudança (a descrição do PR não decide mais quem escreveu; só o `HANDOFF.md`). Os outros dois já existiam e ficam como limite conhecido, dito no topo do script: o check e o `HANDOFF.md` vêm do próprio PR, e todos os agentes publicam pela conta do usuário
 
+- editor, barra de repetição (branch criada em cima de `fase/5-voto-entre-voltas`, que ainda não tem PR): `cifras/correcoes.py` guarda as correções em `cifras/correcoes/<faixa>.json` (fora do Git), separadas da cifra do detector; rota `POST /api/repeticao`; na página, o botão "Repetição" marca o primeiro e o último compasso, pergunta quantas vezes e esconde as outras voltas; tocando, a folha acompanha a volta ("2ª de 4"). 160 testes verdes; rota testada à mão (pôr, recusar sobreposição, recusar o que não cabe, tirar)
+
 ## Falta
-- nada nesta mudança além da revisão
-- depois: editor (branch `editor/1-barra-de-repeticao`, sem PR, esperando o teste do usuário; refazer sobre a `main`)
+- o usuário testar a barra de repetição na página (ninguém olhou a página no navegador ainda)
+- fase 5: GuitarSet rodando em segundo plano (`--resultados fase5.jsonl`); comparar com `fase0.resumo.json`; abrir o PR draft da fase 5 e pedir revisão do Codex
+- editor: depois do teste do usuário, abrir PR draft desta branch (depende do PR da fase 5) e escrever as fases do plano no QG
+- decidir `repeats.lock_repeated_phrases` (o plano manda apagar; não foi medido se faz falta)
 
 ## Próximo comando
-revisão cruzada do PR desta branch pelo Codex, com o cabeçalho novo
+esperar o retorno do usuário sobre a barra de repetição em http://127.0.0.1:8765 (python cifras/servir.py); em paralelo, python cifras/benchmark_guitarset.py D:/PROJETOS/moises-rea/dados/guitarset --resultados fase5.jsonl --resumo quando a medição acabar
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-11 21:43
+2026-11-11 20:03

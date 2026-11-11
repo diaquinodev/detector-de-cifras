@@ -757,3 +757,41 @@ section.part h3 {
   font-weight: 700;
   padding: 8px 7px;
 }
+
+/* Barra de repetição: traço grosso e dois pontos, como na partitura. */
+.bar.repeat-start { border-left: 5px double var(--ink); }
+.bar.repeat-start:first-child { border-left-color: var(--ink); }
+.bar.repeat-end { border-right: 5px double var(--ink); }
+.bar.repeat-start .beats::before,
+.bar.repeat-end .beats::after {
+  content: ":";
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  pointer-events: none;
+  z-index: 3;
+}
+.bar.repeat-start .beats::before { left: 2px; }
+.bar.repeat-end .beats::after { right: 2px; }
+.bar.repeat-anchor { box-shadow: inset 4px 0 0 var(--ink); }
+.repeat-times {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  height: 14px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 14px;
+  color: var(--panel);
+  background: var(--ink);
+  border-radius: 0 0 6px 6px;
+  z-index: 3;
+}
+.repeat-times.now-lap { padding: 0 8px; }

@@ -57,6 +57,7 @@
           </div>
           <button id="loop-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled>Loop</button>
           <button id="edit-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled>Editar</button>
+          <button id="repeat-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled title="Marcar um trecho que se repete">𝄆 Repetição 𝄇</button>
           <button class="toggle-btn" id="toggle-notation" type="button" aria-pressed="false">Δ / #</button>
           <button class="toggle-btn" id="toggle-model" type="button" aria-pressed="false">Modelo</button>
         </div>
@@ -81,6 +82,8 @@
     let bpmTarget = null;
     let loopMode = false;
     let editMode = false;
+    let repeatMode = false;
+    let repeatAnchor = null;
     let countInOn = false;
     let loopRange = null;
     let loopAnchor = null;
@@ -302,6 +305,110 @@
       return " in-loop";
     }
 
+    function allBars(chart) {
+      return (chart.secoes || []).flatMap((section) => section.bars || []);
+    }
+
+    // Para cada compasso escondido por uma barra de repetição, o compasso da primeira
+    // volta que o representa na folha, e em que volta ele está.
+    function repeatFolds(chart) {
+      const folds = new Map();
+      (chart.repeticoes || []).forEach((repeat) => {
+        const length = repeat.fim - repeat.inicio + 1;
+        for (let lap = 1; lap < repeat.vezes; lap += 1) {
+          for (let slot = 0; slot < length; slot += 1) {
+            folds.set(repeat.inicio + lap * length + slot, { shown: repeat.inicio + slot, lap: lap + 1, repeat });
+          }
+        }
+      });
+      return folds;
+    }
+
+    function repeatAt(chart, barNumber) {
+      return (chart.repeticoes || []).find((repeat) => barNumber >= repeat.inicio && barNumber <= repeat.fim) || null;
+    }
+
+    // O instante do áudio visto na folha: dentro de uma volta escondida, vale o mesmo
+    // ponto da primeira volta.
+    function sheetTime(time) {
+      if (!lastChart || !(lastChart.repeticoes || []).length) return { time, lap: 1, repeat: null };
+      const bars = allBars(lastChart);
+      const folds = repeatFolds(lastChart);
+      const here = bars.find((bar) => time >= Number(bar.start) && time < Number(bar.end));
+      if (!here) return { time, lap: 1, repeat: null };
+      const fold = folds.get(Number(here.bar));
+      if (!fold) return { time, lap: 1, repeat: repeatAt(lastChart, Number(here.bar)) };
+      const shown = bars.find((bar) => Number(bar.bar) === fold.shown);
+      if (!shown) return { time, lap: 1, repeat: null };
+      const share = (time - Number(here.start)) / Math.max(0.001, Number(here.end) - Number(here.start));
+      return { time: Number(shown.start) + share * (Number(shown.end) - Number(shown.start)), lap: fold.lap, repeat: fold.repeat };
+    }
+
+    function barText(bar) {
+      return (bar.chords || ["N"]).join(" ");
+    }
+
+    // Quantas vezes seguidas o trecho aparece com a mesma cifra, contando a primeira.
+    function suggestTimes(first, last) {
+      const bars = allBars(lastChart);
+      const byNumber = new Map(bars.map((bar) => [Number(bar.bar), bar]));
+      const length = last - first + 1;
+      let times = 1;
+      while (true) {
+        let same = true;
+        for (let slot = 0; slot < length; slot += 1) {
+          const lapBar = byNumber.get(first + times * length + slot);
+          const base = byNumber.get(first + slot);
+          if (!lapBar || !base || barText(lapBar) !== barText(base)) { same = false; break; }
+        }
+        if (!same) break;
+        times += 1;
+      }
+      return Math.max(2, times);
+    }
+
+    async function sendRepeat(body) {
+      const response = await fetch("/api/repeticao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ faixa: lastChart.faixa, ...body }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        renderChart(lastChart);
+        document.querySelector("#tool-hint").textContent = payload.erro || "Não foi possível salvar a repetição.";
+        return;
+      }
+      lastChart = payload;
+      renderChart(lastChart);
+    }
+
+    function chooseRepeat(barEl) {
+      const number = Number(barEl.dataset.bar);
+      const existing = repeatAt(lastChart, number);
+      if (existing && !repeatAnchor) {
+        if (window.confirm(`Tirar a barra de repetição dos compassos ${existing.inicio} a ${existing.fim} (${existing.vezes}x)?`)) {
+          sendRepeat({ remover: true, inicio: existing.inicio });
+        }
+        return;
+      }
+      if (!repeatAnchor) {
+        repeatAnchor = number;
+        renderChart(lastChart);
+        return;
+      }
+      const first = Math.min(repeatAnchor, number);
+      const last = Math.max(repeatAnchor, number);
+      repeatAnchor = null;
+      const answer = window.prompt(`Compassos ${first} a ${last}: quantas vezes esse trecho é tocado ao todo?`, String(suggestTimes(first, last)));
+      const times = Number.parseInt(answer || "", 10);
+      if (!answer || !Number.isFinite(times)) {
+        renderChart(lastChart);
+        return;
+      }
+      sendRepeat({ inicio: first, fim: last, vezes: times });
+    }
+
     function renderChart(chart) {
       const main = document.querySelector("main");
       const scroll = main.scrollTop;
@@ -346,10 +453,13 @@
       const map = document.querySelector("#song-map");
       map.innerHTML = timeline;
       map.hidden = !timeline;
+      const folds = repeatFolds(chart);
       const parts = chart.secoes.map((section) => {
+        const visible = section.bars.filter((bar) => !folds.has(Number(bar.bar)));
+        if (!visible.length) return "";
         const rows = [];
-        for (let index = 0; index < section.bars.length; index += 4) {
-          rows.push(section.bars.slice(index, index + 4));
+        for (let index = 0; index < visible.length; index += 4) {
+          rows.push(visible.slice(index, index + 4));
         }
         const theory = [section.padrao, section.graus, section.cadencia].filter((item) => item && item !== "silêncio").join(" · ");
         const body = rows.map((row) => {
@@ -364,7 +474,16 @@
               ? ` title="${escapeHtml(`Ajustado por regra (${bar.regra || "ciclo"}). O modelo dizia: ${(bar.chords_modelo || []).map((item) => shownChord(item)).join(" ")}`)}"`
               : "";
             const ruledClass = view.ruled && !view.showModel ? " ruled" : "";
-            return `<div class="bar${ruledClass}${loopMark(bar)}" data-bar="${Number(bar.bar)}" data-start="${bar.start}" data-end="${bar.end}" data-beats="${beats}"${ruleTitle}>${barNum}<div class="beats" style="--beats:${beats}">${buttons}</div></div>`;
+            const repeat = repeatAt(chart, Number(bar.bar));
+            let repeatClass = "";
+            let repeatBadge = "";
+            if (repeat && Number(bar.bar) === repeat.inicio) repeatClass += " repeat-start";
+            if (repeat && Number(bar.bar) === repeat.fim) {
+              repeatClass += " repeat-end";
+              repeatBadge = `<span class="repeat-times" data-repeat="${repeat.inicio}" data-times="${repeat.vezes}">${repeat.vezes}x</span>`;
+            }
+            if (repeatAnchor === Number(bar.bar)) repeatClass += " repeat-anchor";
+            return `<div class="bar${ruledClass}${repeatClass}${loopMark(bar)}" data-bar="${Number(bar.bar)}" data-start="${bar.start}" data-end="${bar.end}" data-beats="${beats}"${ruleTitle}>${barNum}${repeatBadge}<div class="beats" style="--beats:${beats}">${buttons}</div></div>`;
           }).join("");
           return `<div class="row">${cells}</div>`;
         }).join("");
@@ -404,15 +523,22 @@
     function highlight() {
       if (!audio) return;
       const time = audio.currentTime;
+      const onSheet = sheetTime(time);
+      const folded = onSheet.time;
       let currentBar = null;
       sheet.querySelectorAll(".bar").forEach((bar) => {
-        const inside = time >= Number(bar.dataset.start) && time < Number(bar.dataset.end);
+        const inside = folded >= Number(bar.dataset.start) && folded < Number(bar.dataset.end);
         bar.classList.toggle("now", inside);
         if (inside) currentBar = bar;
       });
+      sheet.querySelectorAll(".repeat-times").forEach((badge) => {
+        const playing = onSheet.repeat && Number(badge.dataset.repeat) === onSheet.repeat.inicio;
+        badge.textContent = playing ? `${onSheet.lap}ª de ${badge.dataset.times}` : `${badge.dataset.times}x`;
+        badge.classList.toggle("now-lap", Boolean(playing));
+      });
       sheet.querySelectorAll(".chord-part").forEach((part) => {
-        const chordOn = time >= Number(part.dataset.start) && time < Number(part.dataset.end);
-        const beatOn = time >= Number(part.dataset.beatStart) && time < Number(part.dataset.beatEnd);
+        const chordOn = folded >= Number(part.dataset.start) && folded < Number(part.dataset.end);
+        const beatOn = folded >= Number(part.dataset.beatStart) && folded < Number(part.dataset.beatEnd);
         part.classList.toggle("now-chord", chordOn);
         part.classList.toggle("now-beat", beatOn);
       });
@@ -463,6 +589,8 @@
       if (!hint) return;
       if (!lastChart) hint.textContent = "Escolha uma faixa medida para usar o transporte.";
       else if (editMode) hint.textContent = "Clique num acorde, digite o símbolo e aperte Enter.";
+      else if (repeatMode && repeatAnchor) hint.textContent = `Compasso ${repeatAnchor} marcado como início. Clique no último compasso do trecho que se repete.`;
+      else if (repeatMode) hint.textContent = "Clique no primeiro compasso do trecho que se repete e depois no último. Para tirar uma barra, clique nela.";
       else if (loopMode && loopAnchor) hint.textContent = `Compasso ${loopAnchor.bar} marcado. Clique no último compasso do trecho.`;
       else if (loopRange) hint.textContent = `Loop dos compassos ${loopRange.from}–${loopRange.to}.`;
       else if (loopMode) hint.textContent = "Clique no primeiro compasso e depois no último. O áudio repete esse trecho.";
@@ -498,8 +626,11 @@
         loopAnchor = null;
         loopMode = false;
         editMode = false;
+        repeatMode = false;
+        repeatAnchor = null;
         document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false");
         document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false");
+        document.querySelector("#repeat-toggle").setAttribute("aria-pressed", "false");
       }
       setTransportEnabled(true);
       paintReadouts();
@@ -673,6 +804,10 @@
         return;
       }
       const bar = part.closest(".bar");
+      if (repeatMode && bar) {
+        chooseRepeat(bar);
+        return;
+      }
       if (loopMode && bar) {
         chooseLoop(bar);
         return;
@@ -1027,16 +1162,37 @@
     document.querySelector("#transpose-down").addEventListener("click", () => stepTranspose(-1));
     document.querySelector("#transpose-up").addEventListener("click", () => stepTranspose(1));
     document.querySelector("#transpose-readout").addEventListener("click", () => { semitones = 0; applyPitch(); if (lastChart) renderChart(lastChart); });
+    function leaveRepeatMode() {
+      repeatMode = false;
+      repeatAnchor = null;
+      document.querySelector("#repeat-toggle").setAttribute("aria-pressed", "false");
+    }
+
+    document.querySelector("#repeat-toggle").addEventListener("click", () => {
+      if (repeatMode) {
+        leaveRepeatMode();
+      } else {
+        repeatMode = true;
+        loopMode = false;
+        loopAnchor = null;
+        editMode = false;
+        document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false");
+        document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false");
+        document.querySelector("#repeat-toggle").setAttribute("aria-pressed", "true");
+      }
+      if (lastChart) renderChart(lastChart);
+    });
+
     document.querySelector("#loop-toggle").addEventListener("click", () => {
       loopMode = !loopMode;
       if (!loopMode) loopAnchor = null;
       document.querySelector("#loop-toggle").setAttribute("aria-pressed", String(loopMode));
-      if (loopMode) { editMode = false; document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false"); }
+      if (loopMode) { editMode = false; document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false"); leaveRepeatMode(); }
       if (lastChart) renderChart(lastChart); else paintHint();
     });
     document.querySelector("#edit-toggle").addEventListener("click", () => {
       editMode = !editMode;
-      if (editMode) { loopMode = false; loopAnchor = null; document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false"); }
+      if (editMode) { loopMode = false; loopAnchor = null; document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false"); leaveRepeatMode(); }
       document.querySelector("#edit-toggle").setAttribute("aria-pressed", String(editMode));
       if (lastChart) renderChart(lastChart); else paintHint();
     });

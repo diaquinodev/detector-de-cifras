@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 import analyze
+import correcoes
 from constants import MAX_AUDIO_SECONDS
 
 ROOT = analyze.ROOT
@@ -186,6 +187,7 @@ def chart_for(path: Path) -> dict | None:
         "padroes_harmonicos": data.get("padroes_harmonicos") or [],
         "voz": data.get("voz"),
         "texto": text_path.read_text(encoding="utf-8") if text_path.is_file() else "",
+        "repeticoes": correcoes.valid_repeats(correcoes.read(path.stem), len(bars)),
         "secoes": sections,
     }
 
@@ -233,6 +235,22 @@ def save_chord_edit(
     data = json.loads(path.read_text(encoding="utf-8"))
     apply_chord_edit(data, bar_number, event_index, chord, source)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def save_repeat(track: Path, body: dict) -> None:
+    """Põe ou tira uma barra de repetição nas correções da faixa."""
+    path = OUT / f"{track.stem}.json"
+    if not path.is_file():
+        raise ValueError("Esta faixa ainda não foi medida.")
+    bar_count = len(json.loads(path.read_text(encoding="utf-8")).get("compassos") or [])
+    data = correcoes.read(track.stem)
+    if body.get("remover"):
+        correcoes.remove_repeat(data, int(body.get("inicio")))
+    else:
+        correcoes.add_repeat(
+            data, bar_count, int(body.get("inicio")), int(body.get("fim")), int(body.get("vezes"))
+        )
+    correcoes.write(track.stem, data)
 
 
 def save_result(path: Path, result: dict) -> None:
@@ -324,6 +342,9 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/cifra":
             self._edit_chord()
             return
+        if parsed.path == "/api/repeticao":
+            self._edit_repeat()
+            return
         self._send_json({"erro": "Não encontrado."}, 404)
 
     def _content_length(self) -> int | None:
@@ -359,6 +380,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         chart = chart_for(track)
         self._send_json(chart or {"erro": "A cifra não foi salva."}, 200 if chart else 500)
+
+    def _edit_repeat(self) -> None:
+        try:
+            body = self._json_body()
+            track = resolve_track(str(body.get("faixa") or ""))
+            save_repeat(track, body)
+        except (ValueError, TypeError, json.JSONDecodeError) as error:
+            self._send_json({"erro": str(error)}, 400)
+            return
+        chart = chart_for(track)
+        self._send_json(chart or {"erro": "A cifra não foi encontrada."}, 200 if chart else 500)
 
     def _analyze(self) -> None:
         try:
