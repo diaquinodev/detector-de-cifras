@@ -6,8 +6,8 @@ Uso: python3 revisao-check --corpo corpo.txt --revisoes revisoes.json --head <sh
 HANDOFF.md    o agente que escreveu vem da seção "## Agente atual" (Claude Code, Codex ou
               Gemini). A descrição do PR traz "Autor:" com o nome do dono do repositório;
               o agente não aparece no texto do PR.
-corpo.txt     descrição do PR. Só é lida para os PRs antigos, que traziam
-              "Autor: <agente>": sem agente no HANDOFF.md, vale essa linha.
+corpo.txt     descrição do PR. Não decide nada: se o agente pudesse vir dela, bastaria
+              apagar a seção do HANDOFF.md e escrever outro nome na descrição.
 revisoes.json revisões do PR, em ordem:
               [{"login": "...", "body": "...", "tipo": "review", "commit_id": "<sha>"}]
 --head        SHA do commit atual do PR; revisão de commit anterior não vale (código novo
@@ -22,6 +22,9 @@ O cabeçalho antigo, com "· autor <agente> ·" no meio, continua valendo.
 "Revisão por <agente> · autorrevisão · veredito: ..." fica vermelho de propósito: sem outro
 agente com crédito, o merge é uma decisão consciente do usuário. Regras: AGENTS.md do QG,
 seção "Fluxo de Pull Requests".
+
+Limite conhecido: o check ajuda a não esquecer a revisão, não é uma trava de segurança. O
+script e o HANDOFF.md vêm do próprio PR, e todos os agentes publicam pela conta do usuário.
 """
 
 import argparse
@@ -32,7 +35,6 @@ import sys
 
 AGENTES = ("claude", "codex", "gemini")
 VEREDITOS = ("accept", "accept with notes", "revise")
-AUTOR = re.compile(r"^\s*\**Autor:?\**\s*:?\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 AGENTE_ATUAL = re.compile(r"^##\s*Agente atual\s*\n+([^\n#]+)", re.IGNORECASE | re.MULTILINE)
 CABECALHO = re.compile(
     r"Revis[ãa]o por\s+(?P<revisor>.+?)\s*[·→|-]\s*"
@@ -56,18 +58,14 @@ def veredito_limpo(texto: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[*_`.,;:!]+", " ", texto)).strip().lower()
 
 
-def quem_escreveu(corpo: str, handoff: str) -> str | None:
-    """O agente que escreveu: a seção "Agente atual" do HANDOFF.md; nos PRs antigos, "Autor:"."""
+def quem_escreveu(handoff: str) -> str | None:
+    """O agente que escreveu: a seção "Agente atual" do HANDOFF.md, e só ela."""
     m = AGENTE_ATUAL.search(handoff or "")
-    do_handoff = agente(m[1]) if m else None
-    if do_handoff:
-        return do_handoff
-    m = AUTOR.search(corpo or "")
     return agente(m[1]) if m else None
 
 
 def avaliar(corpo: str, revisoes: list[dict], head: str, handoff: str = "") -> tuple[bool, str]:
-    autor = quem_escreveu(corpo, handoff)
+    autor = quem_escreveu(handoff)
     if not autor:
         return False, ('não achei o agente que escreveu: o HANDOFF.md precisa da seção '
                        '"## Agente atual" com Claude Code, Codex ou Gemini')

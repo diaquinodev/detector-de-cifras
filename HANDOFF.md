@@ -29,6 +29,8 @@ QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tare
 - fase 5 integrada: PR #7
 - autor do PR: a descrição passa a trazer `Autor: Diego Aquino`; `scripts/revisao-check` lê o agente em `## Agente atual` deste arquivo e aceita o cabeçalho `Revisão por X · veredito: ...` (pedido do usuário em 11/11; mesma mudança no kit do QG, com 21 testes lá)
 
+- revisão do Codex no PR #8 (Revise, 3 achados): corrigido o que era desta mudança (a descrição do PR não decide mais quem escreveu; só o `HANDOFF.md`). Os outros dois já existiam e ficam como limite conhecido, dito no topo do script: o check e o `HANDOFF.md` vêm do próprio PR, e todos os agentes publicam pela conta do usuário
+
 ## Falta
 - nada nesta mudança além da revisão
 - depois: editor (branch `editor/1-barra-de-repeticao`, sem PR, esperando o teste do usuário; refazer sobre a `main`)
@@ -40,4 +42,4 @@ revisão cruzada do PR desta branch pelo Codex, com o cabeçalho novo
 nenhum
 
 ## Atualizado em
-2026-11-11 21:40
+2026-11-11 21:43
