@@ -4,10 +4,10 @@
 Claude Code
 
 ## Branch
-fase/5-voto-entre-voltas
+chore/autor-do-pr
 
 ## Trilha
-grande
+rápida
 
 ## Plano/fase
 QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tarefa 109). Rumo confirmado pelo usuário em 11/11: (1) uma cifra por volta usando os ciclos lidos na cifra; (2) editor na página cujas correções viram gabarito
@@ -26,14 +26,18 @@ QG: brain/plans/detector-de-cifras-refino/phase-5-cifra-unica-por-letra.md (tare
 
 - revisão do Codex no PR #7 (Revise, 3 achados) atendida: a entrada da voz medida pelo perfil também pesa no voto; ciclo de 2 compassos fica de fora, dito no texto e testado; a marca só conta na régua quando diz o acorde esperado. Segunda revisão (Revise, 1 achado): o teste da voz pelo perfil agora só passa com uma única volta em dobro. 159 testes verdes
 
+- fase 5 integrada: PR #7
+- autor do PR: a descrição passa a trazer `Autor: Diego Aquino`; `scripts/revisao-check` lê o agente em `## Agente atual` deste arquivo e aceita o cabeçalho `Revisão por X · veredito: ...` (pedido do usuário em 11/11; mesma mudança no kit do QG, com 21 testes lá)
+
 ## Falta
-- nada nesta fase além da revisão. Ficou fora, de propósito: `repeats.lock_repeated_phrases` continua (o plano mandava apagar; ela compara o áudio, não a cifra, e não foi medido se faz falta); a marca `variacao_do_ciclo` ainda não aparece na página; a meta de até 10% de voltas diferentes não foi atingida (36%)
+- nada nesta mudança além da revisão
+- depois: editor (branch `editor/1-barra-de-repeticao`, sem PR, esperando o teste do usuário; refazer sobre a `main`)
 
 ## Próximo comando
-nova revisão cruzada do PR #7 pelo Codex, no commit com as correções (autor: Claude Code)
+revisão cruzada do PR desta branch pelo Codex, com o cabeçalho novo
 
 ## Bloqueios
 nenhum
 
 ## Atualizado em
-2026-11-11 20:38
+2026-11-11 21:40
