@@ -57,6 +57,8 @@
           </div>
           <button id="loop-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled>Loop</button>
           <button id="edit-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled>Editar</button>
+          <button id="repeat-toggle" class="toggle-btn" type="button" aria-pressed="false" disabled title="Marcar um trecho que se repete">𝄆 Repetição 𝄇</button>
+          <button id="repeat-undo" type="button" disabled hidden title="Desfazer a última mudança nas barras (Ctrl+Z)">↶ Desfazer</button>
           <button class="toggle-btn" id="toggle-notation" type="button" aria-pressed="false">Δ / #</button>
           <button class="toggle-btn" id="toggle-model" type="button" aria-pressed="false">Modelo</button>
         </div>
@@ -81,6 +83,10 @@
     let bpmTarget = null;
     let loopMode = false;
     let editMode = false;
+    let repeatMode = false;
+    let repeatAnchor = null;
+    let repeatDrag = null;
+    let repeatHistory = [];
     let countInOn = false;
     let loopRange = null;
     let loopAnchor = null;
@@ -302,6 +308,250 @@
       return " in-loop";
     }
 
+    function allBars(chart) {
+      return (chart.secoes || []).flatMap((section) => section.bars || []);
+    }
+
+    // Para cada compasso escondido por uma barra de repetição, o compasso da primeira
+    // volta que o representa na folha, e em que volta ele está.
+    function repeatFolds(chart) {
+      const folds = new Map();
+      (chart.repeticoes || []).forEach((repeat) => {
+        const length = repeat.fim - repeat.inicio + 1;
+        for (let lap = 1; lap < repeat.vezes; lap += 1) {
+          for (let slot = 0; slot < length; slot += 1) {
+            folds.set(repeat.inicio + lap * length + slot, { shown: repeat.inicio + slot, lap: lap + 1, repeat });
+          }
+        }
+      });
+      return folds;
+    }
+
+    function repeatAt(chart, barNumber) {
+      return (chart.repeticoes || []).find((repeat) => barNumber >= repeat.inicio && barNumber <= repeat.fim) || null;
+    }
+
+    // O instante do áudio visto na folha: dentro de uma volta escondida, vale o mesmo
+    // ponto da primeira volta.
+    function sheetTime(time) {
+      if (!lastChart || !(lastChart.repeticoes || []).length) return { time, lap: 1, repeat: null };
+      const bars = allBars(lastChart);
+      const folds = repeatFolds(lastChart);
+      const here = bars.find((bar) => time >= Number(bar.start) && time < Number(bar.end));
+      if (!here) return { time, lap: 1, repeat: null };
+      const fold = folds.get(Number(here.bar));
+      if (!fold) return { time, lap: 1, repeat: repeatAt(lastChart, Number(here.bar)) };
+      const shown = bars.find((bar) => Number(bar.bar) === fold.shown);
+      if (!shown) return { time, lap: 1, repeat: null };
+      const share = (time - Number(here.start)) / Math.max(0.001, Number(here.end) - Number(here.start));
+      return { time: Number(shown.start) + share * (Number(shown.end) - Number(shown.start)), lap: fold.lap, repeat: fold.repeat };
+    }
+
+    function barText(bar) {
+      return (bar.chords || ["N"]).join(" ");
+    }
+
+    // Quantas vezes seguidas o trecho aparece com a mesma cifra, contando a primeira.
+    function suggestTimes(first, last) {
+      const bars = allBars(lastChart);
+      const byNumber = new Map(bars.map((bar) => [Number(bar.bar), bar]));
+      const length = last - first + 1;
+      let times = 1;
+      while (true) {
+        let same = true;
+        for (let slot = 0; slot < length; slot += 1) {
+          const lapBar = byNumber.get(first + times * length + slot);
+          const base = byNumber.get(first + slot);
+          if (!lapBar || !base || barText(lapBar) !== barText(base)) { same = false; break; }
+        }
+        if (!same) break;
+        times += 1;
+      }
+      return Math.max(2, times);
+    }
+
+    function repeatList() {
+      return (lastChart.repeticoes || []).map((repeat) => ({ ...repeat }));
+    }
+
+    function paintUndo() {
+      const button = document.querySelector("#repeat-undo");
+      if (!button) return;
+      button.hidden = !repeatMode;
+      button.disabled = !repeatMode || !repeatHistory.length;
+    }
+
+    function repeatHint(text) {
+      document.querySelector("#tool-hint").textContent = text;
+    }
+
+    // Quantas vezes o trecho cabe a partir do início, sem passar da próxima barra nem do fim.
+    function repeatRoom(list, repeat) {
+      const length = repeat.fim - repeat.inicio + 1;
+      const after = list.filter((other) => other !== repeat && other.inicio > repeat.inicio).map((other) => other.inicio);
+      const limit = after.length ? Math.min(...after) - 1 : allBars(lastChart).length;
+      return Math.floor((limit - repeat.inicio + 1) / length);
+    }
+
+    // Manda a lista inteira ao servidor. Com "remember", o estado de antes vai para o Desfazer.
+    async function commitRepeats(list, remember = true) {
+      const before = repeatList();
+      let payload = null;
+      let ok = false;
+      try {
+        const response = await fetch("/api/repeticao", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ faixa: lastChart.faixa, repeticoes: list }),
+        });
+        payload = await response.json();
+        ok = response.ok;
+      } catch (error) {
+        payload = { erro: "O servidor local não respondeu." };
+      }
+      if (!ok) {
+        renderChart(lastChart);
+        repeatHint(payload.erro || "Não foi possível salvar a repetição.");
+        return false;
+      }
+      if (remember) repeatHistory.push(before);
+      lastChart = payload;
+      renderChart(lastChart);
+      return true;
+    }
+
+    async function undoRepeat() {
+      if (!repeatHistory.length) return;
+      const previous = repeatHistory.pop();
+      const done = await commitRepeats(previous, false);
+      if (!done) repeatHistory.push(previous);
+      paintUndo();
+    }
+
+    function chooseRepeat(barEl) {
+      const number = Number(barEl.dataset.bar);
+      if (repeatAnchor == null) {
+        if (repeatAt(lastChart, number)) {
+          repeatHint("Este compasso já está numa repetição. Arraste as barras para mover, use − e + para as vezes ou ✕ para tirar.");
+          return;
+        }
+        repeatAnchor = number;
+        renderChart(lastChart);
+        return;
+      }
+      const first = Math.min(repeatAnchor, number);
+      const last = Math.max(repeatAnchor, number);
+      repeatAnchor = null;
+      const list = repeatList();
+      const created = { inicio: first, fim: last, vezes: suggestTimes(first, last) };
+      list.push(created);
+      const room = repeatRoom(list, created);
+      if (room < 2) {
+        renderChart(lastChart);
+        repeatHint("Esse trecho não cabe duas vezes ali: a música ou outra repetição vem logo depois.");
+        return;
+      }
+      created.vezes = Math.min(created.vezes, room);
+      commitRepeats(list);
+    }
+
+    function changeRepeat(start, action) {
+      const list = repeatList();
+      const repeat = list.find((item) => item.inicio === start);
+      if (!repeat) return;
+      if (action === "remove") {
+        commitRepeats(list.filter((item) => item !== repeat));
+        return;
+      }
+      const times = repeat.vezes + (action === "more" ? 1 : -1);
+      if (times < 2) {
+        repeatHint("Uma repetição toca pelo menos 2 vezes. Para tirar a barra, use o ✕.");
+        return;
+      }
+      if (times > repeatRoom(list, repeat)) {
+        repeatHint("Não cabe mais uma vez: a música ou outra repetição vem logo depois.");
+        return;
+      }
+      repeat.vezes = times;
+      commitRepeats(list);
+    }
+
+    // Arrastar uma barra: "start" muda o primeiro compasso, "end" muda o último.
+    function moveRepeat(start, side, barNumber) {
+      const list = repeatList();
+      const repeat = list.find((item) => item.inicio === start);
+      if (!repeat) return;
+      if (side === "start") {
+        if (barNumber === repeat.inicio) return;
+        if (barNumber > repeat.fim) { repeatHint("A barra de início não pode passar da barra de fim."); return; }
+        repeat.inicio = barNumber;
+      } else {
+        if (barNumber === repeat.fim) return;
+        if (barNumber < repeat.inicio) { repeatHint("A barra de fim não pode ficar antes da barra de início."); return; }
+        repeat.fim = barNumber;
+      }
+      const room = repeatRoom(list, repeat);
+      if (room < 2) {
+        repeatHint("Com as barras ali o trecho não cabe duas vezes. Solte em outro compasso.");
+        return;
+      }
+      repeat.vezes = Math.min(repeat.vezes, room);
+      commitRepeats(list);
+    }
+
+    function barUnderPointer(event) {
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      return element ? element.closest(".bar") : null;
+    }
+
+    function clearDropTarget() {
+      sheet.querySelectorAll(".bar.drop-target").forEach((bar) => bar.classList.remove("drop-target"));
+    }
+
+    function startRepeatDrag(event, handle) {
+      event.preventDefault();
+      event.stopPropagation();
+      repeatAnchor = null;
+      repeatDrag = { start: Number(handle.dataset.repeat), side: handle.dataset.side };
+      document.body.classList.add("dragging-repeat");
+      repeatHint(repeatDrag.side === "start" ? "Solte no compasso em que o trecho começa." : "Solte no último compasso do trecho.");
+    }
+
+    document.addEventListener("pointermove", (event) => {
+      if (!repeatDrag) return;
+      clearDropTarget();
+      const bar = barUnderPointer(event);
+      if (bar) bar.classList.add("drop-target");
+    });
+
+    function endRepeatDrag(event, cancelled) {
+      if (!repeatDrag) return;
+      const drag = repeatDrag;
+      repeatDrag = null;
+      document.body.classList.remove("dragging-repeat");
+      const bar = cancelled ? null : barUnderPointer(event);
+      clearDropTarget();
+      paintHint();
+      if (bar) moveRepeat(drag.start, drag.side, Number(bar.dataset.bar));
+    }
+
+    document.addEventListener("pointerup", (event) => endRepeatDrag(event, false));
+    document.addEventListener("pointercancel", (event) => endRepeatDrag(event, true));
+
+    document.addEventListener("keydown", (event) => {
+      if (!repeatMode) return;
+      const typing = event.target && ["INPUT", "TEXTAREA"].includes(event.target.tagName);
+      if (event.key === "Escape" && (repeatAnchor != null || repeatDrag)) {
+        repeatAnchor = null;
+        if (repeatDrag) endRepeatDrag(event, true);
+        renderChart(lastChart);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !typing) {
+        event.preventDefault();
+        undoRepeat();
+      }
+    });
+
     function renderChart(chart) {
       const main = document.querySelector("main");
       const scroll = main.scrollTop;
@@ -346,10 +596,14 @@
       const map = document.querySelector("#song-map");
       map.innerHTML = timeline;
       map.hidden = !timeline;
+      const folds = repeatFolds(chart);
+      sheet.classList.toggle("editing-repeats", repeatMode);
       const parts = chart.secoes.map((section) => {
+        const visible = repeatMode ? section.bars : section.bars.filter((bar) => !folds.has(Number(bar.bar)));
+        if (!visible.length) return "";
         const rows = [];
-        for (let index = 0; index < section.bars.length; index += 4) {
-          rows.push(section.bars.slice(index, index + 4));
+        for (let index = 0; index < visible.length; index += 4) {
+          rows.push(visible.slice(index, index + 4));
         }
         const theory = [section.padrao, section.graus, section.cadencia].filter((item) => item && item !== "silêncio").join(" · ");
         const body = rows.map((row) => {
@@ -364,7 +618,24 @@
               ? ` title="${escapeHtml(`Ajustado por regra (${bar.regra || "ciclo"}). O modelo dizia: ${(bar.chords_modelo || []).map((item) => shownChord(item)).join(" ")}`)}"`
               : "";
             const ruledClass = view.ruled && !view.showModel ? " ruled" : "";
-            return `<div class="bar${ruledClass}${loopMark(bar)}" data-bar="${Number(bar.bar)}" data-start="${bar.start}" data-end="${bar.end}" data-beats="${beats}"${ruleTitle}>${barNum}<div class="beats" style="--beats:${beats}">${buttons}</div></div>`;
+            const repeat = repeatAt(chart, Number(bar.bar));
+            const fold = folds.get(Number(bar.bar));
+            let repeatClass = "";
+            let repeatBadge = "";
+            if (repeat && Number(bar.bar) === repeat.inicio) {
+              repeatClass += " repeat-start";
+              if (repeatMode) repeatBadge += `<span class="repeat-handle" data-repeat="${repeat.inicio}" data-side="start" title="Arraste para mudar onde o trecho começa"></span>`;
+            }
+            if (repeat && Number(bar.bar) === repeat.fim) {
+              repeatClass += " repeat-end";
+              repeatBadge += repeatMode
+                ? `<span class="repeat-handle" data-repeat="${repeat.inicio}" data-side="end" title="Arraste para mudar onde o trecho termina"></span><span class="repeat-ctl" data-repeat="${repeat.inicio}" data-times="${repeat.vezes}"><button type="button" data-act="less" title="Uma vez a menos" aria-label="Uma vez a menos">−</button><b>${repeat.vezes}x</b><button type="button" data-act="more" title="Uma vez a mais" aria-label="Uma vez a mais">+</button><button type="button" data-act="remove" title="Tirar esta repetição" aria-label="Tirar esta repetição">✕</button></span>`
+                : `<span class="repeat-times" data-repeat="${repeat.inicio}" data-times="${repeat.vezes}">${repeat.vezes}x</span>`;
+            }
+            if (repeatMode && fold) repeatClass += " folded-lap";
+            if (repeatAnchor === Number(bar.bar)) repeatClass += " repeat-anchor";
+            const foldTitle = repeatMode && fold && !ruleTitle ? ` title="${fold.lap}ª volta dos compassos ${fold.repeat.inicio} a ${fold.repeat.fim}: fica escondida fora do modo Repetição"` : "";
+            return `<div class="bar${ruledClass}${repeatClass}${loopMark(bar)}" data-bar="${Number(bar.bar)}" data-start="${bar.start}" data-end="${bar.end}" data-beats="${beats}"${ruleTitle}${foldTitle}>${barNum}${repeatBadge}<div class="beats" style="--beats:${beats}">${buttons}</div></div>`;
           }).join("");
           return `<div class="row">${cells}</div>`;
         }).join("");
@@ -395,6 +666,16 @@
       sheet.querySelectorAll(".chord-part").forEach((part) => {
         part.addEventListener("click", () => onChordClick(part));
       });
+      sheet.querySelectorAll(".repeat-handle").forEach((handle) => {
+        handle.addEventListener("pointerdown", (event) => startRepeatDrag(event, handle));
+      });
+      sheet.querySelectorAll(".repeat-ctl button").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          changeRepeat(Number(button.parentElement.dataset.repeat), button.dataset.act);
+        });
+      });
+      paintUndo();
       document.querySelector("#again").addEventListener("click", () => measure(chart.faixa));
       paintHint();
       paintPlay();
@@ -404,15 +685,26 @@
     function highlight() {
       if (!audio) return;
       const time = audio.currentTime;
+      const onSheet = sheetTime(time);
+      const folded = onSheet.time;
       let currentBar = null;
       sheet.querySelectorAll(".bar").forEach((bar) => {
-        const inside = time >= Number(bar.dataset.start) && time < Number(bar.dataset.end);
+        const inside = folded >= Number(bar.dataset.start) && folded < Number(bar.dataset.end);
         bar.classList.toggle("now", inside);
         if (inside) currentBar = bar;
       });
+      sheet.querySelectorAll(".repeat-times").forEach((badge) => {
+        const playing = onSheet.repeat && Number(badge.dataset.repeat) === onSheet.repeat.inicio;
+        badge.textContent = playing ? `${onSheet.lap}ª de ${badge.dataset.times}` : `${badge.dataset.times}x`;
+        badge.classList.toggle("now-lap", Boolean(playing));
+      });
+      sheet.querySelectorAll(".repeat-ctl").forEach((control) => {
+        const playing = onSheet.repeat && Number(control.dataset.repeat) === onSheet.repeat.inicio;
+        control.querySelector("b").textContent = playing ? `${onSheet.lap}ª de ${control.dataset.times}` : `${control.dataset.times}x`;
+      });
       sheet.querySelectorAll(".chord-part").forEach((part) => {
-        const chordOn = time >= Number(part.dataset.start) && time < Number(part.dataset.end);
-        const beatOn = time >= Number(part.dataset.beatStart) && time < Number(part.dataset.beatEnd);
+        const chordOn = folded >= Number(part.dataset.start) && folded < Number(part.dataset.end);
+        const beatOn = folded >= Number(part.dataset.beatStart) && folded < Number(part.dataset.beatEnd);
         part.classList.toggle("now-chord", chordOn);
         part.classList.toggle("now-beat", beatOn);
       });
@@ -463,6 +755,8 @@
       if (!hint) return;
       if (!lastChart) hint.textContent = "Escolha uma faixa medida para usar o transporte.";
       else if (editMode) hint.textContent = "Clique num acorde, digite o símbolo e aperte Enter.";
+      else if (repeatMode && repeatAnchor) hint.textContent = `Compasso ${repeatAnchor} marcado como início. Clique no último compasso do trecho que se repete.`;
+      else if (repeatMode) hint.textContent = "Nova repetição: clique no primeiro compasso do trecho e depois no último. Arraste as barras para mover, − e + mudam as vezes, ✕ tira, Ctrl+Z desfaz. As voltas esmaecidas ficam escondidas fora deste modo.";
       else if (loopMode && loopAnchor) hint.textContent = `Compasso ${loopAnchor.bar} marcado. Clique no último compasso do trecho.`;
       else if (loopRange) hint.textContent = `Loop dos compassos ${loopRange.from}–${loopRange.to}.`;
       else if (loopMode) hint.textContent = "Clique no primeiro compasso e depois no último. O áudio repete esse trecho.";
@@ -498,8 +792,12 @@
         loopAnchor = null;
         loopMode = false;
         editMode = false;
+        repeatMode = false;
+        repeatAnchor = null;
+        repeatHistory = [];
         document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false");
         document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false");
+        document.querySelector("#repeat-toggle").setAttribute("aria-pressed", "false");
       }
       setTransportEnabled(true);
       paintReadouts();
@@ -673,6 +971,10 @@
         return;
       }
       const bar = part.closest(".bar");
+      if (repeatMode && bar) {
+        chooseRepeat(bar);
+        return;
+      }
       if (loopMode && bar) {
         chooseLoop(bar);
         return;
@@ -1027,16 +1329,41 @@
     document.querySelector("#transpose-down").addEventListener("click", () => stepTranspose(-1));
     document.querySelector("#transpose-up").addEventListener("click", () => stepTranspose(1));
     document.querySelector("#transpose-readout").addEventListener("click", () => { semitones = 0; applyPitch(); if (lastChart) renderChart(lastChart); });
+    function leaveRepeatMode() {
+      repeatMode = false;
+      repeatAnchor = null;
+      document.querySelector("#repeat-toggle").setAttribute("aria-pressed", "false");
+      paintUndo();
+    }
+
+    document.querySelector("#repeat-toggle").addEventListener("click", () => {
+      if (repeatMode) {
+        leaveRepeatMode();
+      } else {
+        repeatMode = true;
+        loopMode = false;
+        loopAnchor = null;
+        editMode = false;
+        document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false");
+        document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false");
+        document.querySelector("#repeat-toggle").setAttribute("aria-pressed", "true");
+      }
+      if (lastChart) renderChart(lastChart);
+      paintUndo();
+    });
+
+    document.querySelector("#repeat-undo").addEventListener("click", undoRepeat);
+
     document.querySelector("#loop-toggle").addEventListener("click", () => {
       loopMode = !loopMode;
       if (!loopMode) loopAnchor = null;
       document.querySelector("#loop-toggle").setAttribute("aria-pressed", String(loopMode));
-      if (loopMode) { editMode = false; document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false"); }
+      if (loopMode) { editMode = false; document.querySelector("#edit-toggle").setAttribute("aria-pressed", "false"); leaveRepeatMode(); }
       if (lastChart) renderChart(lastChart); else paintHint();
     });
     document.querySelector("#edit-toggle").addEventListener("click", () => {
       editMode = !editMode;
-      if (editMode) { loopMode = false; loopAnchor = null; document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false"); }
+      if (editMode) { loopMode = false; loopAnchor = null; document.querySelector("#loop-toggle").setAttribute("aria-pressed", "false"); leaveRepeatMode(); }
       document.querySelector("#edit-toggle").setAttribute("aria-pressed", String(editMode));
       if (lastChart) renderChart(lastChart); else paintHint();
     });
