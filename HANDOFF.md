@@ -33,8 +33,10 @@ QG: brain/plans/detector-de-cifras-editor/overview.md (editor; barra de repetiç
 
 - editor, barra de repetição (branch criada em cima de `fase/5-voto-entre-voltas`, que ainda não tem PR): `cifras/correcoes.py` guarda as correções em `cifras/correcoes/<faixa>.json` (fora do Git), separadas da cifra do detector; rota `POST /api/repeticao`; na página, o botão "Repetição" marca o primeiro e o último compasso, pergunta quantas vezes e esconde as outras voltas; tocando, a folha acompanha a volta ("2ª de 4"). 160 testes verdes; rota testada à mão (pôr, recusar sobreposição, recusar o que não cabe, tirar)
 
+- editor, barra de repetição, segunda versão (o usuário não conseguia editar, mover nem desfazer na primeira): sem caixas de pergunta do navegador; no modo Repetição a folha mostra tudo e esmaece as voltas que ficam escondidas; alças para arrastar o início e o fim, botões − e + para as vezes, ✕ para tirar, botão Desfazer e Ctrl+Z; o servidor recebe a lista inteira (`correcoes.set_repeats`, tudo ou nada). 161 testes verdes; cliques, arrasto e desfazer testados num Chrome controlado por script (fora do repositório), com as imagens conferidas
+
 ## Falta
-- o usuário testar a barra de repetição na página (ninguém olhou a página no navegador ainda)
+- o usuário testar a segunda versão da barra de repetição na página
 - fase 5: GuitarSet rodando em segundo plano (`--resultados fase5.jsonl`); comparar com `fase0.resumo.json`; abrir o PR draft da fase 5 e pedir revisão do Codex
 - editor: depois do teste do usuário, abrir PR draft desta branch (depende do PR da fase 5) e escrever as fases do plano no QG
 - decidir `repeats.lock_repeated_phrases` (o plano manda apagar; não foi medido se faz falta)
@@ -46,4 +48,4 @@ esperar o retorno do usuário sobre a barra de repetição em http://127.0.0.1:8
 nenhum
 
 ## Atualizado em
-2026-11-11 20:03
+2026-11-11 21:19

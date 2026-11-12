@@ -101,3 +101,15 @@ def remove_repeat(data: dict, first: int) -> None:
     if len(kept) == len(data.get("repeticoes") or []):
         raise ValueError("Não há repetição começando nesse compasso.")
     data["repeticoes"] = kept
+
+
+def set_repeats(data: dict, bar_count: int, repeats: object) -> None:
+    """Troca todas as repetições de uma vez; ou valem todas, ou nada muda."""
+    if not isinstance(repeats, list):
+        raise ValueError("Envie a lista de repetições.")
+    fresh: dict = {"repeticoes": []}
+    for item in repeats:
+        if not _well_formed(item):
+            raise ValueError("Marque do primeiro ao último compasso e repita de 2 a 64 vezes.")
+        add_repeat(fresh, bar_count, item["inicio"], item["fim"], item["vezes"])
+    data["repeticoes"] = fresh["repeticoes"]

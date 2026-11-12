@@ -238,13 +238,15 @@ def save_chord_edit(
 
 
 def save_repeat(track: Path, body: dict) -> None:
-    """Põe ou tira uma barra de repetição nas correções da faixa."""
+    """Grava as barras de repetição da faixa: a lista inteira, ou uma a pôr ou tirar."""
     path = OUT / f"{track.stem}.json"
     if not path.is_file():
         raise ValueError("Esta faixa ainda não foi medida.")
     bar_count = len(json.loads(path.read_text(encoding="utf-8")).get("compassos") or [])
     data = correcoes.read(track.stem)
-    if body.get("remover"):
+    if "repeticoes" in body:
+        correcoes.set_repeats(data, bar_count, body.get("repeticoes"))
+    elif body.get("remover"):
         correcoes.remove_repeat(data, int(body.get("inicio")))
     else:
         correcoes.add_repeat(

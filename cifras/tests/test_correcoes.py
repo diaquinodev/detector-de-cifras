@@ -53,6 +53,19 @@ class RepeatBarsTest(unittest.TestCase):
         self.assertEqual(correcoes.valid_repeats(data, 12), [{"inicio": 1, "fim": 2, "vezes": 2}])
         self.assertEqual(len(data["repeticoes"]), 2)
 
+    def test_setting_the_whole_list_is_all_or_nothing(self):
+        data = {"repeticoes": [{"inicio": 1, "fim": 2, "vezes": 2}]}
+        wanted = [{"inicio": 9, "fim": 12, "vezes": 2}, {"inicio": 1, "fim": 4, "vezes": 2}]
+        correcoes.set_repeats(data, 40, wanted)
+        self.assertEqual([item["inicio"] for item in data["repeticoes"]], [1, 9])
+        clashing = [{"inicio": 1, "fim": 4, "vezes": 3}, {"inicio": 9, "fim": 12, "vezes": 2}]
+        for bad in (clashing, [{"inicio": 1, "fim": 4, "vezes": 1}], "nada", [{"inicio": 1}]):
+            with self.assertRaises(ValueError):
+                correcoes.set_repeats(data, 40, bad)
+        self.assertEqual([item["inicio"] for item in data["repeticoes"]], [1, 9])
+        correcoes.set_repeats(data, 40, [])
+        self.assertEqual(data["repeticoes"], [])
+
     def test_reading_and_writing_a_file(self):
         with tempfile.TemporaryDirectory() as folder:
             where = Path(folder)
