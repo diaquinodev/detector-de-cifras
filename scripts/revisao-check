@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""revisao-check — o PR só fica verde com revisão, do commit atual, de quem não foi o autor.
+"""revisao-check — o PR só fica verde com revisão, do commit atual, de quem não escreveu o código.
 
-Uso: python3 revisao-check --corpo corpo.txt --revisoes revisoes.json --head <sha>
+Uso: python3 revisao-check --corpo corpo.txt --revisoes revisoes.json --head <sha> [--handoff HANDOFF.md]
 
-corpo.txt     descrição do PR; precisa da linha "Autor: <Claude Code | Codex | Gemini>"
+HANDOFF.md    o agente que escreveu vem da seção "## Agente atual" (Claude Code, Codex ou
+              Gemini). A descrição do PR traz "Autor:" com o nome do dono do repositório;
+              o agente não aparece no texto do PR.
+corpo.txt     descrição do PR. Não decide nada: se o agente pudesse vir dela, bastaria
+              apagar a seção do HANDOFF.md e escrever outro nome na descrição.
 revisoes.json revisões do PR, em ordem:
               [{"login": "...", "body": "...", "tipo": "review", "commit_id": "<sha>"}]
 --head        SHA do commit atual do PR; revisão de commit anterior não vale (código novo
@@ -11,24 +15,31 @@ revisoes.json revisões do PR, em ordem:
 
 Verde (saída 0) quando, no commit atual:
 - a revisão mais recente com o cabeçalho
-      Revisão por <agente> · autor <agente> · veredito: <Accept | Accept with notes | Revise>
-  vem de um agente diferente do autor, com veredito Accept ou Accept with notes; ou
+      Revisão por <agente> · veredito: <Accept | Accept with notes | Revise>
+  vem de um agente diferente do que escreveu, com veredito Accept ou Accept with notes; ou
 - o CodeRabbit publicou revisão sem pendências ("Actionable comments posted: 0").
-"autorrevisão" fica vermelho de propósito: sem outro agente com crédito, o merge é uma
-decisão consciente do usuário. Regras: AGENTS.md do QG, seção "Fluxo de Pull Requests".
+O cabeçalho antigo, com "· autor <agente> ·" no meio, continua valendo.
+"Revisão por <agente> · autorrevisão · veredito: ..." fica vermelho de propósito: sem outro
+agente com crédito, o merge é uma decisão consciente do usuário. Regras: AGENTS.md do QG,
+seção "Fluxo de Pull Requests".
+
+Limite conhecido: o check ajuda a não esquecer a revisão, não é uma trava de segurança. O
+script e o HANDOFF.md vêm do próprio PR, e todos os agentes publicam pela conta do usuário.
 """
 
 import argparse
 import json
+import os
 import re
 import sys
 
 AGENTES = ("claude", "codex", "gemini")
 VEREDITOS = ("accept", "accept with notes", "revise")
-AUTOR = re.compile(r"^\s*\**Autor:?\**\s*:?\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+AGENTE_ATUAL = re.compile(r"^##\s*Agente atual\s*\n+([^\n#]+)", re.IGNORECASE | re.MULTILINE)
 CABECALHO = re.compile(
-    r"Revis[ãa]o por\s+(?P<revisor>.+?)\s*[·→|-]\s*(?P<autor>autorrevis[ãa]o|autor\s+.+?)"
-    r"\s*[·→|-]\s*veredito:\s*(?P<veredito>[^\n]+)",
+    r"Revis[ãa]o por\s+(?P<revisor>.+?)\s*[·→|-]\s*"
+    r"(?:(?P<autor>autorrevis[ãa]o|autor\s+.+?)\s*[·→|-]\s*)?"
+    r"veredito:\s*(?P<veredito>[^\n]+)",
     re.IGNORECASE,
 )
 ACHADOS = re.compile(r"Actionable comments posted:\s*(\d+)", re.IGNORECASE)
@@ -47,11 +58,17 @@ def veredito_limpo(texto: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[*_`.,;:!]+", " ", texto)).strip().lower()
 
 
-def avaliar(corpo: str, revisoes: list[dict], head: str) -> tuple[bool, str]:
-    m = AUTOR.search(corpo or "")
-    autor = agente(m[1]) if m else None
+def quem_escreveu(handoff: str) -> str | None:
+    """O agente que escreveu: a seção "Agente atual" do HANDOFF.md, e só ela."""
+    m = AGENTE_ATUAL.search(handoff or "")
+    return agente(m[1]) if m else None
+
+
+def avaliar(corpo: str, revisoes: list[dict], head: str, handoff: str = "") -> tuple[bool, str]:
+    autor = quem_escreveu(handoff)
     if not autor:
-        return False, 'a descrição do PR precisa da linha "Autor: Claude Code", "Autor: Codex" ou "Autor: Gemini"'
+        return False, ('não achei o agente que escreveu: o HANDOFF.md precisa da seção '
+                       '"## Agente atual" com Claude Code, Codex ou Gemini')
 
     atuais = [r for r in revisoes if r.get("tipo") == "review" and r.get("commit_id") == head]
 
@@ -70,29 +87,29 @@ def avaliar(corpo: str, revisoes: list[dict], head: str) -> tuple[bool, str]:
         antigas = any(CABECALHO.search(r.get("body") or "") for r in revisoes)
         if antigas:
             return False, "há revisão, mas não do commit atual: o código novo precisa ser revisado de novo"
-        return False, (f"sem revisão de outro agente (autor: {autor}); publique com "
-                       '"gh pr review <N> --comment" e o cabeçalho "Revisão por X · autor Y · veredito: ..."')
+        return False, (f"sem revisão de outro agente (quem escreveu: {autor}); publique com "
+                       '"gh pr review <N> --comment" e o cabeçalho "Revisão por X · veredito: ..."')
 
     veredito = veredito_limpo(ultima["veredito"])
     if veredito not in VEREDITOS:
         return False, f'veredito "{ultima["veredito"].strip()}" inválido: use Accept, Accept with notes ou Revise'
     if veredito == "revise":
         return False, "a revisão mais recente pediu correções (veredito: Revise)"
-    if ultima["autor"].lower().startswith("autorrevis"):
+    do_cabecalho = (ultima["autor"] or "").strip()
+    if do_cabecalho.lower().startswith("autorrevis"):
         return False, ("autorrevisão: nenhum outro agente revisou; o merge fica por decisão "
                        "consciente do usuário")
-
-    autor_cabecalho = agente(ultima["autor"])
-    if autor_cabecalho != autor:
-        return False, (f'o cabeçalho diz "{ultima["autor"].strip()}", mas o PR é de {autor}: '
+    # Cabeçalho antigo: se diz o autor, tem de ser o mesmo que escreveu.
+    if do_cabecalho and agente(do_cabecalho) != autor:
+        return False, (f'o cabeçalho diz "{do_cabecalho}", mas quem escreveu foi {autor}: '
                        "corrija o cabeçalho da revisão")
 
     revisor = agente(ultima["revisor"])
     if revisor is None:
         return False, f'revisor "{ultima["revisor"].strip()}" não é Claude Code, Codex nem Gemini'
     if revisor == autor:
-        return False, f"o revisor ({revisor}) é o próprio autor; peça a revisão a outro agente"
-    return True, f"revisado por {revisor} (autor: {autor}) no commit atual, veredito: {veredito}"
+        return False, f"o revisor ({revisor}) é quem escreveu; peça a revisão a outro agente"
+    return True, f"revisado por {revisor} (quem escreveu: {autor}) no commit atual, veredito: {veredito}"
 
 
 def main() -> int:
@@ -102,12 +119,17 @@ def main() -> int:
     p.add_argument("--corpo", required=True)
     p.add_argument("--revisoes", required=True)
     p.add_argument("--head", required=True, help="SHA do commit atual do PR")
+    p.add_argument("--handoff", default="HANDOFF.md", help="arquivo com a seção Agente atual")
     a = p.parse_args()
     with open(a.corpo, encoding="utf-8") as f:
         corpo = f.read()
     with open(a.revisoes, encoding="utf-8") as f:
         revisoes = json.load(f)
-    ok, motivo = avaliar(corpo, revisoes, a.head)
+    handoff = ""
+    if os.path.isfile(a.handoff):
+        with open(a.handoff, encoding="utf-8") as f:
+            handoff = f.read()
+    ok, motivo = avaliar(corpo, revisoes, a.head, handoff)
     print(("revisao-check: ok — " if ok else "revisao-check: ERRO — ") + motivo)
     return 0 if ok else 1
 

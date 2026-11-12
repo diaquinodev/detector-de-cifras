@@ -31,7 +31,7 @@ Para terminar: "fechar sessão" (HANDOFF atualizado, commit, push e PR com o pas
 - Fase média ou grande: crie o `HANDOFF.md` a partir de `scripts/HANDOFF.modelo.md` e
   atualize no mesmo commit de cada passo.
 - Antes de cada commit, rode a verificação abaixo e `sh scripts/handoff-check`.
-- Descrição do PR com `Autor:` (o agente que escreveu); a revisão é feita por outro agente.
+- Descrição do PR com `Autor:` e o nome do dono do repositório; o agente que escreveu fica só no `HANDOFF.md` (`## Agente atual`). A revisão é feita por outro agente.
 
 ## Verificação
 
