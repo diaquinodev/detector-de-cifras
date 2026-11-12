@@ -300,19 +300,26 @@ def map_sections_with_theory(
     if bar_chroma is not None:
         lock_repeated_phrases(bars, bar_chroma)
     tonic, mode, modulation = _refine_key(bars, key)
-    blocks, catalog = discover_repeating_cycles(
-        bars,
-        tonic,
-        mode,
-        harmonize_outliers=True,
-        modulation=modulation,
-    )
 
     has_vocal_profile = vocal_presence is not None and vocal_presence.size == n
     if not has_vocal_profile:
         vocal_presence = np.ones(n, dtype=float)
     if vocal_chest is None or vocal_chest.size != n:
         vocal_chest = vocal_presence.copy()
+
+    # O voto das voltas pesa mais antes de a voz entrar. Só vale com a voz medida (pelo
+    # detector ou pelo perfil); sem medida nenhuma, todas as voltas pesam igual.
+    quiet_until = vocal_onset_bar
+    if quiet_until is None and has_vocal_profile:
+        quiet_until = _vocal_onset_from_profile(vocal_presence, vocal_chest, n)
+    blocks, catalog = discover_repeating_cycles(
+        bars,
+        tonic,
+        mode,
+        harmonize_outliers=True,
+        modulation=modulation,
+        quiet_until=quiet_until,
+    )
 
     if vocal_onset_bar is None:
         if has_vocal_profile:
