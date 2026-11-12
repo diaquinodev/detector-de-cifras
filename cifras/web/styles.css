@@ -839,6 +839,8 @@ section.part h3 {
 }
 .repeat-ctl b {
   min-width: 26px;
+  padding: 0 3px;
+  white-space: nowrap;
   text-align: center;
   font-size: 12px;
   color: var(--panel);

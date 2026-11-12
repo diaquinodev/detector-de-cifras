@@ -35,6 +35,8 @@ QG: brain/plans/detector-de-cifras-editor/overview.md (editor; barra de repetiç
 
 - editor, barra de repetição, segunda versão (o usuário não conseguia editar, mover nem desfazer na primeira): sem caixas de pergunta do navegador; no modo Repetição a folha mostra tudo e esmaece as voltas que ficam escondidas; alças para arrastar o início e o fim, botões − e + para as vezes, ✕ para tirar, botão Desfazer e Ctrl+Z; o servidor recebe a lista inteira (`correcoes.set_repeats`, tudo ou nada). 161 testes verdes; cliques, arrasto e desfazer testados num Chrome controlado por script (fora do repositório), com as imagens conferidas
 
+- editor, barra de repetição: a marcação que acompanha o áudio agora volta ao começo do trecho também com o modo Repetição ligado (antes seguia pelas voltas esmaecidas; apontado pelo usuário com print); o selo mostra a volta atual nos dois modos. Conferido no Chrome por script com a barra do usuário (compassos 1 a 4, 2 vezes)
+
 ## Falta
 - o usuário testar a segunda versão da barra de repetição na página
 - fase 5: GuitarSet rodando em segundo plano (`--resultados fase5.jsonl`); comparar com `fase0.resumo.json`; abrir o PR draft da fase 5 e pedir revisão do Codex
@@ -48,4 +50,4 @@ esperar o retorno do usuário sobre a barra de repetição em http://127.0.0.1:8
 nenhum
 
 ## Atualizado em
-2026-11-11 21:19
+2026-11-11 21:27

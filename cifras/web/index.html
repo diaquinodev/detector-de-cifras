@@ -334,7 +334,7 @@
     // O instante do áudio visto na folha: dentro de uma volta escondida, vale o mesmo
     // ponto da primeira volta.
     function sheetTime(time) {
-      if (repeatMode || !lastChart || !(lastChart.repeticoes || []).length) return { time, lap: 1, repeat: null };
+      if (!lastChart || !(lastChart.repeticoes || []).length) return { time, lap: 1, repeat: null };
       const bars = allBars(lastChart);
       const folds = repeatFolds(lastChart);
       const here = bars.find((bar) => time >= Number(bar.start) && time < Number(bar.end));
@@ -629,7 +629,7 @@
             if (repeat && Number(bar.bar) === repeat.fim) {
               repeatClass += " repeat-end";
               repeatBadge += repeatMode
-                ? `<span class="repeat-handle" data-repeat="${repeat.inicio}" data-side="end" title="Arraste para mudar onde o trecho termina"></span><span class="repeat-ctl" data-repeat="${repeat.inicio}"><button type="button" data-act="less" title="Uma vez a menos" aria-label="Uma vez a menos">−</button><b>${repeat.vezes}x</b><button type="button" data-act="more" title="Uma vez a mais" aria-label="Uma vez a mais">+</button><button type="button" data-act="remove" title="Tirar esta repetição" aria-label="Tirar esta repetição">✕</button></span>`
+                ? `<span class="repeat-handle" data-repeat="${repeat.inicio}" data-side="end" title="Arraste para mudar onde o trecho termina"></span><span class="repeat-ctl" data-repeat="${repeat.inicio}" data-times="${repeat.vezes}"><button type="button" data-act="less" title="Uma vez a menos" aria-label="Uma vez a menos">−</button><b>${repeat.vezes}x</b><button type="button" data-act="more" title="Uma vez a mais" aria-label="Uma vez a mais">+</button><button type="button" data-act="remove" title="Tirar esta repetição" aria-label="Tirar esta repetição">✕</button></span>`
                 : `<span class="repeat-times" data-repeat="${repeat.inicio}" data-times="${repeat.vezes}">${repeat.vezes}x</span>`;
             }
             if (repeatMode && fold) repeatClass += " folded-lap";
@@ -697,6 +697,10 @@
         const playing = onSheet.repeat && Number(badge.dataset.repeat) === onSheet.repeat.inicio;
         badge.textContent = playing ? `${onSheet.lap}ª de ${badge.dataset.times}` : `${badge.dataset.times}x`;
         badge.classList.toggle("now-lap", Boolean(playing));
+      });
+      sheet.querySelectorAll(".repeat-ctl").forEach((control) => {
+        const playing = onSheet.repeat && Number(control.dataset.repeat) === onSheet.repeat.inicio;
+        control.querySelector("b").textContent = playing ? `${onSheet.lap}ª de ${control.dataset.times}` : `${control.dataset.times}x`;
       });
       sheet.querySelectorAll(".chord-part").forEach((part) => {
         const chordOn = folded >= Number(part.dataset.start) && folded < Number(part.dataset.end);
